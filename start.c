@@ -84,7 +84,7 @@ BOOL WINAPI windowsCtrlCHandler(DWORD fdwCtrlType) {
       countAndSetShutdown(false);
       return TRUE;
     default:
-    	return FALSE
+    	return FALSE;
   }
 #endif
 

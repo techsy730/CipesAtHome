@@ -21,11 +21,19 @@
 #define REVERSE_TYPE_SORT_FRAMES 41		// Penalty to perform type descending sort
 #define JUMP_STORAGE_NO_TOSS_FRAMES 5		// Penalty for not tossing the last item (because we need to get Jump Storage)
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
-#define DEFAULT_ITERATION_LIMIT 100000 // Cutoff for iterations explored before resetting
-#define ITERATION_LIMIT_INCREASE 100000000 // Amount to increase the iteration limit by when finding a new record
+#define DEFAULT_ITERATION_LIMIT 100000l // Cutoff for iterations explored before resetting
+#define ITERATION_LIMIT_INCREASE 100000000l // Amount to increase the iteration limit by when finding a new record
 #define INVENTORY_SIZE 20
 
 #define CHECK_SHUTDOWN_INTERVAL 200
+
+#define NOISY_DEBUG_FLAG 0
+// Only uncomment the below if you are really using NOISY_DEBUG_FLAG
+//#if NOISY_DEBUG_FLAG
+//#define NOISY_DEBUG(...) printf(__VA_ARGS__)
+//#else
+#define NOISY_DEBUG(...) do {} while(0)
+//#endif
 
 typedef enum Alpha_Sort Alpha_Sort;
 typedef enum Type_Sort Type_Sort;
@@ -2221,12 +2229,12 @@ struct Inventory getSortedInventory(struct Inventory inventory, enum Action sort
 	}
 }
 
-void logIterations(int ID, int stepIndex, struct BranchPath * curNode, int iterationCount, int level)
+void logIterations(int ID, int stepIndex, struct BranchPath * curNode, long iterationCount, int level)
 {
 	char callString[30];
 	char iterationString[100];
 	sprintf(callString, "Call %d", ID);
-	sprintf(iterationString, "%d steps currently taken, %d frames accumulated so far; %dk iterations",
+	sprintf(iterationString, "%d steps currently taken, %d frames accumulated so far; %ldk iterations",
 		stepIndex, curNode->description.totalFramesTaken, iterationCount / 1000);
 	recipeLog(level, "Calculator", "Info", callString, iterationString);
 }
@@ -2261,8 +2269,8 @@ struct Result calculateOrder(int ID) {
 			break;
 		}
 		int stepIndex = 0;
-		int iterationCount = 0;
-		int iterationLimit = DEFAULT_ITERATION_LIMIT;
+		long iterationCount = 0;
+		long iterationLimit = DEFAULT_ITERATION_LIMIT;
 
 		// Create root of tree path
 		curNode = initializeRoot();
@@ -2281,17 +2289,19 @@ struct Result calculateOrder(int ID) {
 		// If the user is not exploring only one branch, reset when it is time
 		// Start iteration loop
 		while (iterationCount < iterationLimit || freeRunning) {
-			if (checkShutdownOnIndex(iterationCount)) {
+			if (checkShutdownOnIndexLong(iterationCount)) {
 				break;
 			}
 			// In the rare occassion that the root node runs out of legal moves due to "select",
 			// exit out of the while loop to restart
 			if (curNode == NULL) {
+				NOISY_DEBUG("No current node. Breaking for next branch.\n");
 				break;
 			}
-			
+
 			// Check for end condition (57 recipes + the Chapter 5 intermission)
 			if(curNode->numOutputsCreated == NUM_RECIPES) {
+				NOISY_DEBUG("End condition\n");
 				// All recipes have been fulfilled!
 				// Check that the total time taken is strictly less than the current observed record.
 				// Apply a frame penalty if the final move did not toss an item.
@@ -2334,6 +2344,7 @@ struct Result calculateOrder(int ID) {
 			}
 			// End condition not met. Check if this current level has something in the event queue
 			else if (curNode->legalMoves == NULL) {
+				NOISY_DEBUG("End condition not met. Check if this current level has something in the event queue\n");
 				// This node has not yet been assigned an array of legal moves.
 				// Generate the list of all possible recipes
 				fulfillRecipes(curNode);
@@ -2435,7 +2446,9 @@ struct Result calculateOrder(int ID) {
 				
 			}
 			else {
+				NOISY_DEBUG("Normal end\n");
 				if (curNode->numLegalMoves == 0) {
+					NOISY_DEBUG("No moves left\n");
 					// No legal moves are left to evaluate, go back up...
 					// Wipe away the current node
 					
@@ -2534,13 +2547,13 @@ struct Result calculateOrder(int ID) {
 			periodicGithubCheck();
 		}
 		
-		// Unexpected break out of loop. Return the nothing results.
-		return (struct Result) { -1, -1 };
-		
 		// For profiling
 		/*if (total_dives == 100) {
 			exit(1);
 		}*/
 		
 	}
+	
+	// Unexpected break out of loop. Return the nothing results.
+	return (struct Result) { -1, -1 };
 }
