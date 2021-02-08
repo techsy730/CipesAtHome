@@ -173,7 +173,7 @@ struct BranchPath* initializeRoot();
 
 // Other
 void periodicGithubCheck();
-void logIterations(int ID, int stepIndex, struct BranchPath * curNode, int iterationCount, int level);
+void logIterations(int ID, int stepIndex, struct BranchPath * curNode, long iterationCount, int level);
 struct Result calculateOrder(int ID);
 
 #endif
