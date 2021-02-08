@@ -8,6 +8,7 @@
 #include <libconfig.h>
 #include "config.h"
 #include "logger.h"
+#include "base.h"
 
 struct memory {
 	char *data;
@@ -116,12 +117,7 @@ void handle_post(char* url, FILE *fp, int localRecord, char *nickname) {
 	fseek(fp, 0, SEEK_SET);
 	wt.data = malloc(fsize+ strlen(nickname) + 50); // Offer enough padding for postfields
 
-	if (wt.data == NULL) {
-		printf("Fatal error! Ran out of heap memory.\n");
-		printf("Press enter to quit.");
-		char exitChar = getchar();
-		exit(1);
-	}
+	checkMallocFailed(wt.data);
 
 	size_t bytes_written;
 	bytes_written = sprintf(wt.data, "{\"frames\":\"%d\",\"userName\":\"%s\",\"routeContent\":\"", localRecord, nickname);
