@@ -3,8 +3,14 @@ CipesAtHome/Release/
 CipesAtHome/x64/
 CipesAtHome/.vs/**
 results/
+prof/
 recipes.log
 *.ipch
 *.db
 *.o
+*.gcda
+*.gcno
+**/*.gcda
+**/*.gcno
+log.txt
 recipesAtHome
