@@ -26,6 +26,8 @@
 #define ITERATION_LIMIT_INCREASE 100000000l // Amount to increase the iteration limit by when finding a new record
 #define INVENTORY_SIZE 20
 
+#define NEW_BRANCH_LOG_LEVEL 3
+
 #define CHECK_SHUTDOWN_INTERVAL 200
 
 #define NOISY_DEBUG_FLAG 0
@@ -2204,12 +2206,14 @@ struct Inventory getSortedInventory(struct Inventory inventory, enum Action sort
 
 void logIterations(int ID, int stepIndex, struct BranchPath * curNode, long iterationCount, int level)
 {
-	char callString[30];
-	char iterationString[100];
-	sprintf(callString, "Call %d", ID);
-	sprintf(iterationString, "%d steps currently taken, %d frames accumulated so far; %ldk iterations",
-		stepIndex, curNode->description.totalFramesTaken, iterationCount / 1000);
-	recipeLog(level, "Calculator", "Info", callString, iterationString);
+	if (will_log_level(level)) {
+		char callString[30];
+		char iterationString[100];
+		sprintf(callString, "Call %d", ID);
+		sprintf(iterationString, "%d steps currently taken, %d frames accumulated so far; %ldk iterations",
+			stepIndex, curNode->description.totalFramesTaken, iterationCount / 1000);
+		recipeLog(level, "Calculator", "Info", callString, iterationString);
+	}
 }
 
 /*-------------------------------------------------------------------
@@ -2251,12 +2255,12 @@ struct Result calculateOrder(int ID) {
 		
 		total_dives++;
 
-		if (total_dives % branchInterval == 0) {
+		if (total_dives % branchInterval == 0 && will_log_level(NEW_BRANCH_LOG_LEVEL)) {
 			char temp1[30];
 			char temp2[30];
 			sprintf(temp1, "Call %d", ID);
 			sprintf(temp2, "Searching New Branch %d", total_dives);
-			recipeLog(3, "Calculator", "Info", temp1, temp2);
+			recipeLog(NEW_BRANCH_LOG_LEVEL, "Calculator", "Info", temp1, temp2);
 		}
 
 		// If the user is not exploring only one branch, reset when it is time
@@ -2291,9 +2295,11 @@ struct Result calculateOrder(int ID) {
 							char *filename = malloc(sizeof(char) * 17);
 							sprintf(filename, "results/%d.txt", optimizeResult.last->description.totalFramesTaken);
 							printResults(filename, optimizeResult.root);
-							char tmp[100];
-							sprintf(tmp, "New local fastest roadmap found! %d frames, saved %d after rearranging", optimizeResult.last->description.totalFramesTaken, curNode->description.totalFramesTaken - optimizeResult.last->description.totalFramesTaken);
-							recipeLog(1, "Calculator", "Info", "Roadmap", tmp);
+							if (will_log_level(1)) {
+								char tmp[100];
+								sprintf(tmp, "New local fastest roadmap found! %d frames, saved %d after rearranging", optimizeResult.last->description.totalFramesTaken, curNode->description.totalFramesTaken - optimizeResult.last->description.totalFramesTaken);
+								recipeLog(1, "Calculator", "Info", "Roadmap", tmp);
+							}
 							free(filename);
 							if (debug) {
 								testRecord(result_cache.frames);

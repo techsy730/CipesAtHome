@@ -11,6 +11,10 @@ int init_level_cfg() {
 	return 0;
 }
 
+inline int get_log_level() {
+	return level_cfg;
+}
+
 int recipeLog(int level, char *process, char *subProcess, char *activity, char *entry) {
 	if (level_cfg >= level) {
 		int hours, mins, secs, month, day, year;
