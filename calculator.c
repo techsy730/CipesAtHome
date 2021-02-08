@@ -2434,7 +2434,7 @@ struct Result calculateOrder(int ID) {
 					continue;
 				}
 
-				prefetchShutdownOnIndex(iterationCount);
+				prefetchShutdownOnIndexLong(iterationCount);
 
 				// Moves would already be shuffled with randomise, but select
 				// would always choose the first one unless we select here
