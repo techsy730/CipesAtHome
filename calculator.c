@@ -10,6 +10,7 @@
 #include <time.h>
 #include <string.h>
 #include <stdbool.h>
+#include <omp.h>
 #include "absl/base/port.h"
 
 #define NUM_RECIPES 58 			// Including Chapter 5 representation
@@ -1428,7 +1429,7 @@ void periodicGithubCheck() {
 	else if (update == 1) {
 		printf("Please visit https://github.com/SevenChords/CipesAtHome/releases to download the newest version of this program!\n");
 		printf("Press ENTER to exit the program.\n");
-		char exitChar = getchar();
+		ABSL_ATTRIBUTE_UNUSED char exitChar = getchar();
 		exit(1);
 	}
 }
@@ -1670,7 +1671,7 @@ void printResults(char *filename, struct BranchPath *path) {
 	if (fp == NULL) {
 		printf("Could not locate %s... This is a bug.\n", filename);
 		printf("Press ENTER to exit.\n");
-		char exitChar = getchar();
+		ABSL_ATTRIBUTE_UNUSED char exitChar = getchar();
 		exit(1);
 	}
 	// Write header information
