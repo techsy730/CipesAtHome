@@ -18,7 +18,14 @@ HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
 RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
 
+LLVM_PROFDATA?=llvm-profdata
 PROF_DIR?=prof
+CLANG_PROF_MERGED?=$(TARGET).profdata
+
+# .gcda and .gcno from GCC
+# .profraw and .profdata from clang
+# .dpi from ICC
+KNOWN_PROFILE_DATA_EXTENSIONS=*.gcda *.gcno *.profraw *.profdata *.dpi
 
 IS_CC_EXACTLY_CC=0
 ifeq ($(CC),cc)
@@ -74,31 +81,57 @@ endif
 
 
 ifeq (1,$(PROFILE_GENERATE))
-	CFLAGS+=-fprofile-generate=$(PROF_DIR)
+	ifeq (clang,$(COMPILER))
+		CFLAGS+=-fcs-profile-generate=$(PROF_DIR)
+	else
+		ifneq (gcc,$(COMPILER))
+			$(warning Unrecognized compiler "$(CC)". Profile generation might not work, disable "PROFILE_GENERATE" if you get build errors about unrecognized flags)
+		endif
+		CFLAGS+=-fprofile-generate=$(PROF_DIR)
+	endif
+endif
+
+ifeq (1,$(PROFILE_GENERATE))
+	MAKE_PROF_DIR_COMMAND=@mkdir -p $(PROF_DIR)
+else
+	MAKE_PROF_DIR_COMMAND=
+endif
+
+ifeq (1,$(PROFILE_USE))
+	ifeq (clang,$(COMPILER))
+		CFLAGS+=-fprofile-use=$(CLANG_PROF_MERGED)
+	else
+		ifeq (gcc,$(COMPILER))
+			CFLAGS+=-fprofile-use=$(PROF_DIR) -fprofile-correction
+		else
+			CFLAGS+=-fprofile-use=$(PROF_DIR)
+		endif
+	endif
+endif
+
+ifeq (1 clang, $(PROFILE_USE) $(COMPILER))
+	PROF_FINISH_COMMAND=$(LLVM_PROFDATA) merge -output=$(CLANG_PROF_MERGED) $(PROF_DIR)
+else
+	PROF_FINISH_COMMAND=
 endif
 
 default: $(TARGET)
 
-.PHONY: clean clean_prof make_prof_dir
+.PHONY: clean clean_prof make_prof_dir prof_finish
 
-ifeq (1,$(PROFILE_GENERATE))
 make_prof_dir:
-	@mkdir -p $(PROF_DIR)
-else
-make_prof_dir: ;
-endif
+	$(MAKE_PROF_DIR_COMMAND)
+	
+prof_finish:
+	$(PROF_FINISH_COMMAND)
 
-ifeq (1,$(PROFILE_USE))
-	CFLAGS+=-fprofile-use=$(PROF_DIR) -fprofile-correction
-endif
-
-$(HIGH_PERF_OBJS): %.o: %.c $(DEPS)
+$(HIGH_PERF_OBJS): %.o: %.c $(DEPS) | prof_finish
 	$(CC) $(CFLAGS) $(HIGH_OPT_CFLAGS) -c -o $@ $<
 
-%.o: %.c $(DEPS)
+%.o: %.c $(DEPS) | prof_finish
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(TARGET): $(OBJ) | make_prof_dir
+$(TARGET): $(OBJ) | make_prof_dir prof_finish
 	$(CC) $(CFLAGS) $(HIGH_OPT_CFLAGS) -o $@ $^
 
 clean:
@@ -107,9 +140,12 @@ clean:
 
 ifeq (.,$(PROF_DIR))
 clean_prof:
-	$(RM) ./*.gcda
+	$(RM) $(addprefix ./,$(KNOWN_PROFILE_DATA_EXTENSIONS))
+	$(RM) $(CLANG_PROF_MERGED)
 else
 clean_prof:
-	$(RM) ./*.gcda
-	$(RM) -r $(PROF_DIR)/*.gcda
+	$(RM) $(addprefix ./,$(KNOWN_PROFILE_DATA_EXTENSIONS))
+	$(RM) -r 	$(RM) $(addprefix $(PROF_DIR)/,$(KNOWN_PROFILE_DATA_EXTENSIONS))
+	$(RM) $(CLANG_PROF_MERGED)
 endif
+
