@@ -1,12 +1,13 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#import <stdbool.h>
-#import "absl/base/port.h"
+#include <stdbool.h>
+#include "absl/base/port.h"
 
 int init_level_cfg();
-inline int get_log_level();
-inline bool can_be_logged(int level) {
-	return 
+int get_log_level();
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline bool will_log_level(int level) {
+	return level <= get_log_level();
+}
 int recipeLog(int level, char *process, char *subProcess, char *activity, char *entry);
 #endif

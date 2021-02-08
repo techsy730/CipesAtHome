@@ -1,4 +1,4 @@
-CFLAGS:=-lcurl -lconfig -fopenmp -Wall -I . -O2 $(CFLAGS)
+CFLAGS:=-lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
 HIGH_OPT_CFLAGS?=-O3
 TARGET=recipesAtHome
 DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)

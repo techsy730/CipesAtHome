@@ -1,5 +1,9 @@
 // Functions and Macros for common logic that doesn't really belong anywhere else.
+#ifndef CRIPES_BASE_H
+#define CRIPES_BASE_H
 
+
+#include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
 #include "absl/base/port.h"
@@ -54,3 +58,4 @@ inline void checkMallocFailed(const void* const p) {
 #define _PREFETCH_READ_NO_TEMPORAL_LOCALITY(addr) do { } while (0)
 #endif
 
+#endif

@@ -1,6 +1,7 @@
+#include "logger.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-#include "logger.h"
 #include "config.h"
 #include <time.h>
 
@@ -11,7 +12,7 @@ int init_level_cfg() {
 	return 0;
 }
 
-inline int get_log_level() {
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline int get_log_level() {
 	return level_cfg;
 }
 

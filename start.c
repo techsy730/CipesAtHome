@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <omp.h>
 #include "absl/base/port.h"
 
 #ifdef _MSC_FULL_VER
