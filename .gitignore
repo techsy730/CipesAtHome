@@ -10,7 +10,13 @@ recipes.log
 *.o
 *.gcda
 *.gcno
+*.profraw
+*.profdata
+*.dpi
 **/*.gcda
 **/*.gcno
+**/*.profraw
+**/*.profdata
+**/*.dpi
 log.txt
 recipesAtHome
