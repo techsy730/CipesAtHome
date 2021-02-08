@@ -17,6 +17,5 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE inline void prefetchShutdown() {
 ABSL_ATTRIBUTE_ALWAYS_INLINE inline bool askedToShutdown() {
 	return ABSL_PREDICT_FALSE(_askedToShutdownVar);
 }
-#endif
 
 #endif
