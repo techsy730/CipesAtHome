@@ -6,15 +6,18 @@ OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o 
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
 # Recognized configurable variables:
-# CFLAGS : Any additional CFLAGS to be used (are specified after built in CFLAGS)
-# HIGH_OPT_CLFLAGS : Any additional CFLAGS to pass to known CPU bottleneck source files
+# CFLAGS=... : Any additional CFLAGS to be used (are specified after built in CFLAGS)
+# HIGH_OPT_CLFLAGS=... : Any additional CFLAGS to pass to known CPU bottleneck source files
 #   This overrides the default of "-O3" instead of appends to it
 # USE_LTO=1 : Whether to enable link time optimizations (-flto)
 #   Note that link time optimizations can be rather fiddly to get to work
 # PROFILE_GENERATE=1 : Whether to enable profile generation for profile assited optimization
-#   To actually generate the profile, you need to run the built recipesAtHome for a while. Ideally have a few new records found and a few dozen branches searched before quitting.
+#   To actually generate the profile, you need to run the built recipesAtHome for a while. Ideally have a few new local records found and a few dozen branches searched before quitting (temporarily renaming your results folder may be helpfull for this)
 # PROFILE_USE=1 : Whether to enable profile generation for profile assited optimization
 #   MAKE SURE TO `make clean` FIRST before using after a PROFILE_GENERATE and generating the profile
+# PERFORMANCE_PROFILING=1
+#   Generate a binary ready to be profiled using gprov or similar
+#   Unlike PROFILE_GENERATE which generatees profiles for profile assisted optimization, this option makes a binary ready for use for performance profiling.
 
 RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
 
@@ -46,6 +49,10 @@ endif
 ifneq (,$(filter $(RECOGNIZED_YES), $(PROFILE_USE)))
 	PROFILE_USE=1
 endif
+ifneq (,$(filter $(RECOGNIZED_YES), $(PERFORMANCE_PROFILING)))
+	PERFORMANCE_PROFILING=1
+endif
+
 
 ifeq ($(PROFILE_GENERATE) $(PROFILE_USE), 1 1)
 	$(error Cannot set both PROFILE_GENERATE and PROFILE_USE to true)
@@ -79,7 +86,12 @@ ifeq (1,$(USE_LTO))
 	endif
 endif
 
-
+ifeq (1,$(PERFORMANCE_PROFILING))
+	CFLAGS+=-g -pg
+	ifeq (gcc 1,$(COMPILER) $(USE_LTO))
+		CFLAGS+=-ffat-lto-objects
+	endif
+endif
 ifeq (1,$(PROFILE_GENERATE))
 	ifeq (clang,$(COMPILER))
 		CFLAGS+=-fcs-profile-generate=$(PROF_DIR)
