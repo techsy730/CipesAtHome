@@ -6,7 +6,7 @@
 #include "absl/base/port.h"
 
 // In the header file so we can take the address of it.
-bool _askedToShutdownVar;
+extern bool _askedToShutdownVar;
 
 bool requestShutdown();
 
