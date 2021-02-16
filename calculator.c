@@ -42,11 +42,11 @@ typedef struct MoveDescription MoveDescription;
 int **invFrames;
 struct Recipe *recipeList;
 
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline bool checkShutdownOnIndex(int i) {
+ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool checkShutdownOnIndex(int i) {
 	return i % CHECK_SHUTDOWN_INTERVAL == 0 && askedToShutdown();
 }
 
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline bool checkShutdownOnIndexLong(long i) {
+ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool checkShutdownOnIndexLong(long i) {
 	return i % CHECK_SHUTDOWN_INTERVAL == 0 && askedToShutdown();
 }
 
