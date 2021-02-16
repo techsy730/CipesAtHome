@@ -157,7 +157,7 @@ clean_prof:
 else
 clean_prof:
 	$(RM) $(addprefix ./,$(KNOWN_PROFILE_DATA_EXTENSIONS))
-	$(RM) -r 	$(RM) $(addprefix $(PROF_DIR)/,$(KNOWN_PROFILE_DATA_EXTENSIONS))
+	$(RM) -r $(addprefix $(PROF_DIR)/,$(KNOWN_PROFILE_DATA_EXTENSIONS))
 	$(RM) $(CLANG_PROF_MERGED)
 endif
 
