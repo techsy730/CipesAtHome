@@ -5,15 +5,11 @@
 #include "config.h"
 #include <time.h>
 
-int level_cfg;
+int level_cfg = 1;
 
 int init_level_cfg() {
 	level_cfg = getConfigInt("logLevel");
 	return 0;
-}
-
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline int get_log_level() {
-	return level_cfg;
 }
 
 int recipeLog(int level, char *process, char *subProcess, char *activity, char *entry) {
