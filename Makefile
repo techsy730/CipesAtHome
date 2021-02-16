@@ -53,7 +53,7 @@ endif
 ifneq (,$(filter $(RECOGNIZED_YES), $(PERFORMANCE_PROFILING)))
 	PERFORMANCE_PROFILING=1
 endif
-ifneq (,$(filter $(DEBUG), $(DEBUG)))
+ifneq (,$(filter $(RECOGNIZED_YES), $(DEBUG)))
 	PERFORMANCE_PROFILING=1
 endif
 
