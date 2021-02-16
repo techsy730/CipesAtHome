@@ -20,6 +20,10 @@ HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 # PERFORMANCE_PROFILING=1
 #   Generate a binary ready to be profiled using gprov or similar
 #   Unlike PROFILE_GENERATE which generatees profiles for profile assisted optimization, this option makes a binary ready for use for performance profiling.
+# USE_GOOGLE_PERFTOOLS=1
+#   Use Google's perftools (and malloc implementation).
+#   For Ubuntu, you need to install the packages
+#     google-perftools, libgoogle-perftools-dev
 
 RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
 
@@ -54,8 +58,11 @@ endif
 ifneq (,$(filter $(RECOGNIZED_YES), $(PERFORMANCE_PROFILING)))
 	PERFORMANCE_PROFILING=1
 endif
-ifneq (,$(filter $(DEBUG), $(DEBUG)))
+ifneq (,$(filter $(RECOGNIZED_YES), $(DEBUG)))
 	PERFORMANCE_PROFILING=1
+endif
+ifneq (,$(filter $(RECOGNIZED_YES), $(USE_GOOGLE_PERFTOOLS)))
+	USE_GOOGLE_PERFTOOLS=1
 endif
 
 
@@ -83,6 +90,21 @@ else
 	COMPILER=unknown
 endif
 
+
+ifeq (1,$(USE_GOOGLE_PERFTOOLS))
+	ifeq (1,$(PERFORMANCE_PROFILING))
+		DEBUG?=1
+		CFLAGS:=-ltcmalloc_and_profiler $(CFLAGS)
+	else
+		CFLAGS:=-ltcmalloc_minimal $(CFLAGS)
+	endif
+else
+	ifeq (1,$(PERFORMANCE_PROFILING))
+		DEBUG?=1
+		CFLAGS+=-pg
+	endif
+endif
+
 ifeq (1,$(USE_LTO))
 	DEBUG_CFLAGS+=-ffat-lto-objects
 	ifeq (gcc,$(COMPILER))
@@ -92,10 +114,6 @@ ifeq (1,$(USE_LTO))
 	endif
 endif
 
-ifeq (1,$(PERFORMANCE_PROFILING))
-	DEBUG?=1
-	CFLAGS+=-pg
-endif
 ifeq (1,$(PROFILE_GENERATE))
 	ifeq (clang,$(COMPILER))
 		CFLAGS+=-fcs-profile-generate=$(PROF_DIR)
