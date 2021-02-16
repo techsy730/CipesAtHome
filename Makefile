@@ -1,11 +1,13 @@
-CFLAGS:=-lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
-HIGH_OPT_CFLAGS?=-O3
+CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
+DEBUG_CFLAGS?=-g
+HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
 TARGET=recipesAtHome
 DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
-OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o
+OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
 # Recognized configurable variables:
+# DEBUG=1 Include debug symbols in build
 # CFLAGS=... : Any additional CFLAGS to be used (are specified after built in CFLAGS)
 # HIGH_OPT_CLFLAGS=... : Any additional CFLAGS to pass to known CPU bottleneck source files
 #   This overrides the default of "-O3" instead of appends to it
@@ -52,6 +54,9 @@ endif
 ifneq (,$(filter $(RECOGNIZED_YES), $(PERFORMANCE_PROFILING)))
 	PERFORMANCE_PROFILING=1
 endif
+ifneq (,$(filter $(DEBUG), $(DEBUG)))
+	PERFORMANCE_PROFILING=1
+endif
 
 
 ifeq ($(PROFILE_GENERATE) $(PROFILE_USE), 1 1)
@@ -79,6 +84,7 @@ else
 endif
 
 ifeq (1,$(USE_LTO))
+	DEBUG_CFLAGS+=-ffat-lto-objects
 	ifeq (gcc,$(COMPILER))
 		CFLAGS+=-flto=jobserver -fuse-ld=gold
 	else
@@ -87,10 +93,8 @@ ifeq (1,$(USE_LTO))
 endif
 
 ifeq (1,$(PERFORMANCE_PROFILING))
-	CFLAGS+=-g -pg
-	ifeq (gcc 1,$(COMPILER) $(USE_LTO))
-		CFLAGS+=-ffat-lto-objects
-	endif
+	DEBUG?=1
+	CFLAGS+=-pg
 endif
 ifeq (1,$(PROFILE_GENERATE))
 	ifeq (clang,$(COMPILER))
@@ -125,6 +129,10 @@ ifeq (1 clang, $(PROFILE_USE) $(COMPILER))
 	PROF_FINISH_COMMAND=$(LLVM_PROFDATA) merge -output=$(CLANG_PROF_MERGED) $(PROF_DIR)
 else
 	PROF_FINISH_COMMAND=
+endif
+
+ifeq (1,$(DEBUG))
+	CFLAGS+=$(DEBUG_CFLAGS)
 endif
 
 default: $(TARGET)
