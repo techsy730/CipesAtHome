@@ -99,10 +99,10 @@ endif
 ifeq (1,$(PROFILE_GENERATE))
 	ifeq (clang,$(COMPILER))
 		CFLAGS+=-fcs-profile-generate=$(PROF_DIR)
+	else ifeq (gcc,$(COMPILER))
+		CFLAGS+=-fprofile-generate=$(PROF_DIR) -fprofile-update=prefer-atomic
 	else
-		ifneq (gcc,$(COMPILER))
-			$(warning Unrecognized compiler "$(CC)". Profile generation might not work, disable "PROFILE_GENERATE" if you get build errors about unrecognized flags)
-		endif
+		$(warning Unrecognized compiler "$(CC)". Profile generation might not work, disable "PROFILE_GENERATE" if you get build errors about unrecognized flags)
 		CFLAGS+=-fprofile-generate=$(PROF_DIR)
 	endif
 endif
