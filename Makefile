@@ -1,6 +1,6 @@
 CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g
-EXTRA_DEBUG_CFLAGS?=-rdynamic -fsanitize=address -fno-omit-frame-pointer -DINCLUDE_STACK_TRACES=1
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -DINCLUDE_STACK_TRACES=1
+DEBUG_VERIFY_PROFILING_CFLAGS?=-rdynamic -fsanitize=address
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
 TARGET=recipesAtHome
 DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
@@ -8,7 +8,7 @@ OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o 
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
 # Recognized configurable variables:
-# DEBUG=1 Include debug symbols in build
+# DEBUG=1 Include debug symbols in the build and include stack traces (minimal to no impact on performance, just makes the binary bigger)
 # CFLAGS=... : Any additional CFLAGS to be used (are specified after built in CFLAGS)
 # HIGH_OPT_CLFLAGS=... : Any additional CFLAGS to pass to known CPU bottleneck source files
 #   This overrides the default of "-O3" instead of appends to it
@@ -21,6 +21,8 @@ HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 # PERFORMANCE_PROFILING=1
 #   Generate a binary ready to be profiled using gprov or similar
 #   Unlike PROFILE_GENERATE which generatees profiles for profile assisted optimization, this option makes a binary ready for use for performance profiling.
+#   You may want to consider setting DEBUG_VERIFY_PROFILING=1 as well if you want to have even more things like heap validation.
+# DEBUG_VERIFY_PROFILING=1 Extra debugging flags to enable for things like verifying heap integrity and performance profiling (WILL reduce performance)
 # USE_GOOGLE_PERFTOOLS=1
 #   Use Google's perftools (and malloc implementation).
 #   For Ubuntu, you need to install the packages
@@ -63,6 +65,9 @@ endif
 ifneq (,$(filter $(RECOGNIZED_YES), $(DEBUG)))
 	DEBUG=1
 	DEBUG_EXPLICIT=1
+endif
+ifneq (,$(filter $(RECOGNIZED_YES), $(DEBUG_VERIFY_PROFILING)))
+	DEBUG_VERIFY_PROFILING=1
 endif
 ifneq (,$(filter $(RECOGNIZED_YES), $(USE_GOOGLE_PERFTOOLS)))
 	USE_GOOGLE_PERFTOOLS=1
@@ -119,6 +124,7 @@ ifeq (1,$(USE_LTO))
 endif
 
 ifeq (1,$(PROFILE_GENERATE))
+	DEBUG?=1
 	ifeq (clang,$(COMPILER))
 		CFLAGS+=-fcs-profile-generate=$(PROF_DIR)
 	else ifeq (gcc,$(COMPILER))
@@ -154,11 +160,11 @@ else
 endif
 
 ifeq (1,$(DEBUG))
-	ifeq (1,$(DEBUG_EXPLICIT))
+	ifeq (1,$(DEBUG_VERIFY_PROFILING))
 		ifeq (gcc 0,$(COMPILER) $(USE_GOOGLE_PERFTOOLS))
-			EXTRA_DEBUG_CFLAGS+=-static-libasan
+			DEBUG_VERIFY_PROFILING_CFLAGS+=-static-libasan
 		endif
-		DEBUG_CFLAGS+=$(EXTRA_DEBUG_CFLAGS)
+		DEBUG_CFLAGS+=$(DEBUG_VERIFY_PROFILING_CFLAGS)
 	endif
 	CFLAGS+=$(DEBUG_CFLAGS)
 	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
@@ -166,7 +172,7 @@ endif
 
 default: $(TARGET)
 
-.PHONY: clean clean_prof make_prof_dir prof_finish
+.PHONY: clean clean_prof prof_clean make_prof_dir prof_finish
 
 make_prof_dir:
 	$(MAKE_PROF_DIR_COMMAND)
@@ -197,4 +203,6 @@ clean_prof:
 	$(RM) -r $(addprefix $(PROF_DIR)/,$(KNOWN_PROFILE_DATA_EXTENSIONS))
 	$(RM) $(CLANG_PROF_MERGED)
 endif
+
+prof_clean: clean_prof
 
