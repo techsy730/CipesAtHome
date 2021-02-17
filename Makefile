@@ -1,5 +1,6 @@
-CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
+CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g
+EXTRA_DEBUG_CFLAGS?=-rdynamic -fsanitize=address -fno-omit-frame-pointer -DINCLUDE_STACK_TRACES=1
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
 TARGET=recipesAtHome
 DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
@@ -25,7 +26,7 @@ HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 #   For Ubuntu, you need to install the packages
 #     google-perftools, libgoogle-perftools-dev
 
-RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
+RECOGNIZED_YES=1 true True TRUE yes Yes YES on On ON
 
 LLVM_PROFDATA?=llvm-profdata
 PROF_DIR?=prof
@@ -45,6 +46,7 @@ ifeq ($(CC),)
 	IS_CC_EMPTY=1
 endif
 
+DEBUG_EXPLICIT=0
 
 ifneq (,$(filter $(RECOGNIZED_YES), $(USE_LTO)))
 	USE_LTO=1
@@ -60,6 +62,7 @@ ifneq (,$(filter $(RECOGNIZED_YES), $(PERFORMANCE_PROFILING)))
 endif
 ifneq (,$(filter $(RECOGNIZED_YES), $(DEBUG)))
 	DEBUG=1
+	DEBUG_EXPLICIT=1
 endif
 ifneq (,$(filter $(RECOGNIZED_YES), $(USE_GOOGLE_PERFTOOLS)))
 	USE_GOOGLE_PERFTOOLS=1
@@ -78,7 +81,7 @@ ifneq ($(IS_CC_EXACTLY_CC) $(IS_CC_EMPTY), 0 0)
 	ifeq ($(UNAME), Darwin)
 		MACPREFIX:=$(shell brew --prefix)
 		CC:=$(MACPREFIX)/opt/llvm/bin/clang
-		CFLAGS:=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib $(CFLAGS)
+		CFLAGS+=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib $(CFLAGS)
 	endif
 endif
 
@@ -90,13 +93,14 @@ else
 	COMPILER=unknown
 endif
 
-
 ifeq (1,$(USE_GOOGLE_PERFTOOLS))
 	ifeq (1,$(PERFORMANCE_PROFILING))
 		DEBUG?=1
-		CFLAGS:=-ltcmalloc_and_profiler $(CFLAGS)
+		CFLAGS+=-ltcmalloc_and_profiler
+	else ifeq (1,$(DEBUG))
+		CFLAGS+=-ltcmalloc
 	else
-		CFLAGS:=-ltcmalloc_minimal $(CFLAGS)
+		CFLAGS+=-ltcmalloc_minimal
 	endif
 else
 	ifeq (1,$(PERFORMANCE_PROFILING))
@@ -150,7 +154,14 @@ else
 endif
 
 ifeq (1,$(DEBUG))
+	ifeq (1,$(DEBUG_EXPLICIT))
+		ifeq (gcc 0,$(COMPILER) $(USE_GOOGLE_PERFTOOLS))
+			EXTRA_DEBUG_CFLAGS+=-static-libasan
+		endif
+		DEBUG_CFLAGS+=$(EXTRA_DEBUG_CFLAGS)
+	endif
 	CFLAGS+=$(DEBUG_CFLAGS)
+	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
 endif
 
 default: $(TARGET)
