@@ -16,6 +16,7 @@
 #include <omp.h>
 #include "absl/base/port.h"
 
+// These model Paper Mario TTYD game behavior. Do not edit these.
 #define NUM_RECIPES 58 			// Including Chapter 5 representation
 #define CHOOSE_2ND_INGREDIENT_FRAMES 56 	// Penalty for choosing a 2nd item
 #define TOSS_FRAMES 32				// Penalty for having to toss an item
@@ -29,9 +30,10 @@
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
 #define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
-#define ITERATION_LIMIT_INCREASE 10000000l // Amount to increase the iteration limit by when finding a new record
-#define ITERATION_LIMIT_MAX 500000000l // Maxumum iteration limit before increases shrink drastically
-#define ITERATION_LIMIT_INCREASE_PAST_MAX 100l // Amount to increase the iteration limit by when finding a new record when past the max
+#define ITERATION_LIMIT_INCREASE 5000000l // Amount to increase the iteration limit by when finding a new PB
+#define ITERATION_LIMIT_INCREASE_FIRST (long)(1.75*ITERATION_LIMIT_INCREASE) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
+#define ITERATION_LIMIT_MAX 30*ITERATION_LIMIT_INCREASE // Maxumum iteration limit before increases shrink drastically
+#define ITERATION_LIMIT_INCREASE_PAST_MAX 1000l // Amount to increase the iteration limit by when finding a new record when past the max
 
 #define NEW_BRANCH_LOG_LEVEL 3
 
@@ -2227,6 +2229,18 @@ static void logIterations(int ID, int stepIndex, struct BranchPath * curNode, lo
 	}
 }
 
+static void logIterationsAfterPB(int ID, int stepIndex, struct BranchPath * curNode, int afterOptimizingFrames, long iterationCount, long oldIterationLimit, long iterationLimit, int level)
+{
+	if (will_log_level(level)) {
+		char callString[30];
+		char iterationString[300];
+		sprintf(callString, "Call %d", ID);
+		sprintf(iterationString, "%d steps currently taken, %d (%d after optimizing) frames accumulated so far; %ldk iterations (%ldk previous iteration max, %ldk new iteration max)",
+			stepIndex, curNode->description.totalFramesTaken, afterOptimizingFrames, iterationCount / 1000, oldIterationLimit / 1000, iterationLimit / 1000);
+		recipeLog(level, "Calculator", "Info", callString, iterationString);
+	}
+}
+
 /*-------------------------------------------------------------------
  * Function 	: calculateOrder
  * Inputs	: int ID
@@ -2317,15 +2331,21 @@ struct Result calculateOrder(int ID) {
 							}
 							result_cache = (struct Result){ optimizeResult.last->description.totalFramesTaken, ID };
 							
+							const long oldIterationLimit = iterationLimit;
 							// Reset the iteration count so we continue to explore near this record
 							if (iterationLimit < ITERATION_LIMIT_MAX) {
-								iterationLimit = iterationCount + ITERATION_LIMIT_INCREASE;
+								if (iterationLimit == DEFAULT_ITERATION_LIMIT) {
+									iterationLimit = iterationCount + ITERATION_LIMIT_INCREASE_FIRST;
+								} else {
+									iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX);
+								}
 								if (iterationLimit > ITERATION_LIMIT_MAX) {
 									iterationLimit = ITERATION_LIMIT_MAX;
 								}
 							} else {
-								iterationLimit = iterationCount + ITERATION_LIMIT_INCREASE_PAST_MAX;
+								iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE_PAST_MAX, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX/50);
 							}
+							logIterationsAfterPB(ID, stepIndex, curNode, optimizeResult.last->description.totalFramesTaken, iterationCount, oldIterationLimit, iterationLimit, 3);
 						}
 					}
 					
