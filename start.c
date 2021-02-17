@@ -117,14 +117,11 @@ void setSignalHandlers() {
 #endif
 }
 	
-int main(size_t argc, char **argv) {
+int main(int argc, char **argv) {
 
 	int maxLoops = -1;
 	if (argc >= 2) {
 		maxLoops = atoi(argv[1]);
-	} else {
-		fprintf(stderr, "fail parsing");
-		exit(1);
 	}
 
 	current_frame_record = UNSET_FRAME_RECORD;
