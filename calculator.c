@@ -11,6 +11,8 @@
 #include <time.h>
 #include <string.h>
 #include <stdbool.h>
+#include <limits.h>
+#include <assert.h>
 #include <omp.h>
 #include "absl/base/port.h"
 
@@ -22,10 +24,14 @@
 #define TYPE_SORT_FRAMES 39			// Penalty to perform type ascending sort
 #define REVERSE_TYPE_SORT_FRAMES 41		// Penalty to perform type descending sort
 #define JUMP_STORAGE_NO_TOSS_FRAMES 5		// Penalty for not tossing the last item (because we need to get Jump Storage)
+
+// User configurable tunables
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
-#define DEFAULT_ITERATION_LIMIT 100000l // Cutoff for iterations explored before resetting
-#define ITERATION_LIMIT_INCREASE 100000000l // Amount to increase the iteration limit by when finding a new record
-#define INVENTORY_SIZE 20
+#define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
+#define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
+#define ITERATION_LIMIT_INCREASE 10000000l // Amount to increase the iteration limit by when finding a new record
+#define ITERATION_LIMIT_MAX 500000000l // Maxumum iteration limit before increases shrink drastically
+#define ITERATION_LIMIT_INCREASE_PAST_MAX 100l // Amount to increase the iteration limit by when finding a new record when past the max
 
 #define NEW_BRANCH_LOG_LEVEL 3
 
@@ -209,7 +215,7 @@ MoveDescription createCookDescription(struct BranchPath *node, struct Recipe rec
 	MoveDescription useDescription;
 	useDescription.action = Cook;
 	
-	int ingredientLoc[2];
+	int ingredientLoc[2] = {INT_MIN, INT_MIN};
 	
 	// Determine the locations of both ingredients
 	ingredientLoc[0] = indexOfItemInInventory(*tempInventory, combo.item1);
@@ -1719,6 +1725,8 @@ void printSortData(FILE *fp, enum Action curNodeAction) {
 	};
 }
 
+#define INDEX_ITEM_UNDEFINED INT_MIN
+
 /*-------------------------------------------------------------------
  * Function : reallocateRecipes
  * Inputs	: struct BranchPath	*newRoot
@@ -1751,7 +1759,7 @@ void reallocateRecipes(struct BranchPath* newRoot, enum Type_Sort* rearranged_re
 
 				// Only want recipes where all ingredients are in the last 10 slots of the evaluated inventory
 				int indexItem1 = indexOfItemInInventory(placement->inventory, combo.item1);
-				int indexItem2;
+				int indexItem2 = INDEX_ITEM_UNDEFINED;
 				if (indexItem1 < 10) {
 					continue;
 				}
@@ -1780,6 +1788,8 @@ void reallocateRecipes(struct BranchPath* newRoot, enum Type_Sort* rearranged_re
 					temp_description->itemIndex2 = -1;
 				}
 				else {
+					assert(ABSL_PREDICT_TRUE(indexItem2 != INDEX_ITEM_UNDEFINED));
+				
 					// Two ingredients to navigate to, but order matters
 					// Pick the larger-index number ingredient first, as it will reduce
 					// the frames needed to reach the other ingredient
@@ -2205,14 +2215,14 @@ struct Inventory getSortedInventory(struct Inventory inventory, enum Action sort
 	}
 }
 
-void logIterations(int ID, int stepIndex, struct BranchPath * curNode, long iterationCount, int level)
+static void logIterations(int ID, int stepIndex, struct BranchPath * curNode, long iterationCount, long iterationLimit, int level)
 {
 	if (will_log_level(level)) {
 		char callString[30];
-		char iterationString[100];
+		char iterationString[200];
 		sprintf(callString, "Call %d", ID);
-		sprintf(iterationString, "%d steps currently taken, %d frames accumulated so far; %ldk iterations",
-			stepIndex, curNode->description.totalFramesTaken, iterationCount / 1000);
+		sprintf(iterationString, "%d steps currently taken, %d frames accumulated so far; %ldk iterations (%ldk current iteration max)",
+			stepIndex, curNode->description.totalFramesTaken, iterationCount / 1000, iterationLimit / 1000);
 		recipeLog(level, "Calculator", "Info", callString, iterationString);
 	}
 }
@@ -2258,7 +2268,7 @@ struct Result calculateOrder(int ID) {
 
 		if (total_dives % branchInterval == 0 && will_log_level(NEW_BRANCH_LOG_LEVEL)) {
 			char temp1[30];
-			char temp2[30];
+			char temp2[40];
 			sprintf(temp1, "Call %d", ID);
 			sprintf(temp2, "Searching New Branch %d", total_dives);
 			recipeLog(NEW_BRANCH_LOG_LEVEL, "Calculator", "Info", temp1, temp2);
@@ -2297,8 +2307,8 @@ struct Result calculateOrder(int ID) {
 							sprintf(filename, "results/%d.txt", optimizeResult.last->description.totalFramesTaken);
 							printResults(filename, optimizeResult.root);
 							if (will_log_level(1)) {
-								char tmp[100];
-								sprintf(tmp, "New local fastest roadmap found! %d frames, saved %d after rearranging", optimizeResult.last->description.totalFramesTaken, curNode->description.totalFramesTaken - optimizeResult.last->description.totalFramesTaken);
+								char tmp[200];
+								sprintf(tmp, "Call %d][New local fastest roadmap found! %d frames, saved %d after rearranging", ID, optimizeResult.last->description.totalFramesTaken, curNode->description.totalFramesTaken - optimizeResult.last->description.totalFramesTaken);
 								recipeLog(1, "Calculator", "Info", "Roadmap", tmp);
 							}
 							free(filename);
@@ -2308,7 +2318,14 @@ struct Result calculateOrder(int ID) {
 							result_cache = (struct Result){ optimizeResult.last->description.totalFramesTaken, ID };
 							
 							// Reset the iteration count so we continue to explore near this record
-							iterationLimit = iterationCount + ITERATION_LIMIT_INCREASE;
+							if (iterationLimit < ITERATION_LIMIT_MAX) {
+								iterationLimit = iterationCount + ITERATION_LIMIT_INCREASE;
+								if (iterationLimit > ITERATION_LIMIT_MAX) {
+									iterationLimit = ITERATION_LIMIT_MAX;
+								}
+							} else {
+								iterationLimit = iterationCount + ITERATION_LIMIT_INCREASE_PAST_MAX;
+							}
 						}
 					}
 					
@@ -2456,10 +2473,10 @@ struct Result calculateOrder(int ID) {
 				iterationCount++;
 				if (iterationCount % (branchInterval * DEFAULT_ITERATION_LIMIT) == 0
 					&& (freeRunning || iterationLimit != DEFAULT_ITERATION_LIMIT)) {
-					logIterations(ID, stepIndex, curNode, iterationCount, 3);
+					logIterations(ID, stepIndex, curNode, iterationCount, iterationLimit, 3);
 				}
-				else if (iterationCount % 10000 == 0) {
-					logIterations(ID, stepIndex, curNode, iterationCount, 6);
+				else if (iterationCount % VERBOSE_ITERATION_LOG_RATE == 0) {
+					logIterations(ID, stepIndex, curNode, iterationCount, iterationLimit, 6);
 				}
 			}
 		}
@@ -2526,8 +2543,8 @@ struct Result calculateOrder(int ID) {
 		}
 		
 		// For profiling
-		/*if (total_dives == 100) {
-			exit(1);
+		/*if (total_dives >= 100) {
+			return (struct Result) { -1, -1 };
 		}*/
 		
 	}
