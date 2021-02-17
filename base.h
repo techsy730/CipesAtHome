@@ -7,6 +7,36 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "absl/base/port.h"
+
+#ifdef INCLUDE_STACK_TRACES
+#ifdef __GLIBC__ // Sorely lacking, but hopefully should work good enough.
+#include <execinfo.h>
+#endif
+#endif
+
+#define STACK_TRACE_FRAMES 15
+
+inline void printStackTraceF(FILE* f) {
+#ifdef INCLUDE_STACK_TRACES
+#ifdef __GLIBC__ // Sorely lacking, but hopefully should work good enough.
+  void *array[STACK_TRACE_FRAMES];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, STACK_TRACE_FRAMES);
+
+  char** backtrace_output = backtrace_symbols(array, size);
+  if (backtrace_output == NULL) {
+  	fprintf(f, "Unable to gather data for stack trace.\n");
+  	return;
+	}
+  fprintf(f, "%s\n", *backtrace_output);
+  free(backtrace_output);
+#else
+  fprintf(f, "Unable to gather data for stack trace (unsupported platform).\n");
+#endif
+#endif
+}
  
  /*-------------------------------------------------------------------
  * Function 	: checkMallocFailed
@@ -20,8 +50,9 @@
  -------------------------------------------------------------------*/
 inline void checkMallocFailed(const void* const p) {
 	if (ABSL_PREDICT_FALSE(p == NULL)) {
-		printf("Fatal error! Ran out of heap memory.\n");
-		printf("Press enter to quit.\n");
+		fprintf(stderr, "Fatal error! Ran out of heap memory.\n");
+		fprintf(stderr, "Press enter to quit.\n");
+		printStackTraceF(stderr);
 		ABSL_ATTRIBUTE_UNUSED char exitChar = getchar();
 		exit(1);
 	}
