@@ -1,5 +1,6 @@
-CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
+CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -I . -O2 $(CFLAGS)
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic -DINCLUDE_STACK_TRACES=1
+EXTRA_DEBUG_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
 TARGET=recipesAtHome
 DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
@@ -92,18 +93,19 @@ else
 	COMPILER=unknown
 endif
 
-
 ifeq (1,$(USE_GOOGLE_PERFTOOLS))
 	ifeq (1,$(PERFORMANCE_PROFILING))
 		DEBUG?=1
 		CFLAGS:=-ltcmalloc_and_profiler $(CFLAGS)
+	else ifeq (1,$(DEBUG))
+		CFLAGS:=-ltcmalloc $(CFLAGS)
 	else
 		CFLAGS:=-ltcmalloc_minimal $(CFLAGS)
 	endif
 else
 	ifeq (1,$(PERFORMANCE_PROFILING))
 		DEBUG?=1
-		CFLAGS+=-pg
+		CFLAGS+=-pg -fsanitize=addresses
 	endif
 endif
 
@@ -153,6 +155,12 @@ else
 endif
 
 ifeq (1,$(DEBUG))
+	ifeq (1,$(DEBUG_EXPLICIT))
+		ifeq (gcc 0,$(COMPILER) $(USE_GOOGLE_PERFTOOLS))
+			EXTRA_DEBUG_CFLAGS+=-static-libasan
+		endif
+		DEBUG_CFLAGS+=$(EXTRA_DEBUG_CFLAGS)
+	endif
 	CFLAGS+=$(DEBUG_CFLAGS)
 	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
 endif
