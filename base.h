@@ -14,6 +14,62 @@
 #endif
 #endif
 
+#if defined(_MSC_FULL_VER) || defined(_MSC_VER)
+#define _CIPES_IS_WINDOWS 1
+#else
+#define _CIPES_IS_WINDOWS 0
+#endif
+
+// _MSC_VER 1910 is Visual Studio 2017
+#if defined(__GNUC__) || defined(__clang__) || (defined(_MSC_VER) && _MSC_VER >= 1910)
+#define SUPPORTS_TYPEOF 1
+#endif
+
+#if ABSL_HAVE_BUILTIN(__autotype) || (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)))
+#define SUPPORTS_AUTOTYPE 1
+#endif
+
+// MAX is NOT assured to not repeat side effects; x and y MUST be side effect free.
+#if __cplusplus >= 201103L // C++11 or greater
+#define MAX(x,y) ({ \
+	decltype((x)) _x = (x); \
+	decltype((y)) _y = (y); \
+	_x > _y ?	_x : _y;})
+#elif SUPPORTS_AUTOTYPE
+#define MAX(x,y) ({ \
+	__auto_type _x = (x); \
+	__auto_type _y = (y); \
+	_x > _y ?	_x : _y;})
+#elif SUPPORTS_TYPEOF
+#define MAX(x,y) ({ \
+	typeof((x)) _x = (x); \
+	typeof((y)) _y = (y); \
+	_x > _y ?	_x : _y;})
+#else
+#define MAX(x,y) (((x) > (y)) ? (x) : (y))
+#endif
+
+// MIN is NOT assured to not repeat side effects; x and y MUST be side effect free.
+#if __cplusplus >= 201103L // C++11 or greater
+#define MIN(x,y) ({ \
+	auto _x = (x); \
+	auto _y = (y); \
+	_x < _y ?	_x : _y;})
+#elif SUPPORTS_AUTOTYPE
+#define MIN(x,y) ({ \
+	__auto_type _x = (x); \
+	__auto_type _y = (y); \
+	_x < _y ?	_x : _y;})
+#elif SUPPORTS_TYPEOF
+#define MIN(x,y) ({ \
+	typeof((x)) _x = (x); \
+	typeof((y)) _y = (y); \
+	_x < _y ?	_x : _y;})
+#else
+#define MIN(x,y) (((x) < (y)) ? (x) : (y))
+#endif
+
+
 #define STACK_TRACE_FRAMES 15
 
 inline void printStackTraceF(FILE* f) {
