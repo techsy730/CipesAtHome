@@ -1536,11 +1536,11 @@ void printCh5Sort(struct CH5 *ch5Data, FILE *fp) {
 void printCookData(struct BranchPath *curNode, MoveDescription desc, FILE *fp) {
 	struct Cook *cookData = desc.data;
 	size_t nulls = curNode->prev->inventory.nulls;
-	fprintf(fp, "Use [%s] in slot %d ", getItemName(cookData->item1),
+	fprintf(fp, "Use [%s] in slot %zu ", getItemName(cookData->item1),
 		cookData->itemIndex1 - (cookData->itemIndex1 < 10 ? nulls : 0) + 1);
 
 	if (cookData->numItems == 2) {
-		fprintf(fp, "and [%s] in slot %d ", getItemName(cookData->item2),
+		fprintf(fp, "and [%s] in slot %zu ", getItemName(cookData->item2),
 			cookData->itemIndex2 - (cookData->itemIndex2 < 10 ? nulls : 0) + 1);
 	}
 
