@@ -16,6 +16,6 @@ int getLocalRecord();
 void setLocalRecord(int frames);
 const char* getLocalVersion();
 
-int main(); // Main method for entire algorithm
+int main(size_t argc, char **argv); // Main method for entire algorithm
 
 #endif
