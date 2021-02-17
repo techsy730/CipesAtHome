@@ -1,6 +1,6 @@
 CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic -DINCLUDE_STACK_TRACES=1
-EXTRA_DEBUG_CFLAGS?=
+DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
 TARGET=recipesAtHome
 DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
@@ -21,6 +21,8 @@ HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 # PERFORMANCE_PROFILING=1
 #   Generate a binary ready to be profiled using gprov or similar
 #   Unlike PROFILE_GENERATE which generatees profiles for profile assisted optimization, this option makes a binary ready for use for performance profiling.
+#   You may want to consider setting DEBUG_VERIFY_PROFILING=1 as well if you want to have even more things like heap validation.
+# DEBUG_VERIFY_PROFILING=1 Extra debugging flags to enable for things like verifying heap integrity and performance profiling (WILL reduce performance)
 # USE_GOOGLE_PERFTOOLS=1
 #   Use Google's perftools (and malloc implementation).
 #   For Ubuntu, you need to install the packages
@@ -64,6 +66,9 @@ ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG)))
 	DEBUG=1
 	DEBUG_EXPLICIT=1
 endif
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG_VERIFY_PROFILING)))
+	DEBUG_VERIFY_PROFILING=1
+endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_GOOGLE_PERFTOOLS)))
 	USE_GOOGLE_PERFTOOLS=1
 endif
@@ -105,7 +110,7 @@ ifeq (1,$(USE_GOOGLE_PERFTOOLS))
 else
 	ifeq (1,$(PERFORMANCE_PROFILING))
 		DEBUG?=1
-		CFLAGS+=-pg -fsanitize=addresses
+		CFLAGS+=-pg
 	endif
 endif
 
@@ -155,11 +160,11 @@ else
 endif
 
 ifeq (1,$(DEBUG))
-	ifeq (1,$(DEBUG_EXPLICIT))
+	ifeq (1,$(DEBUG_VERIFY_PROFILING))
 		ifeq (gcc 0,$(COMPILER) $(USE_GOOGLE_PERFTOOLS))
-			EXTRA_DEBUG_CFLAGS+=-static-libasan
+			DEBUG_VERIFY_PROFILING_CFLAGS+=-static-libasan -fsanitize=adresses
 		endif
-		DEBUG_CFLAGS+=$(EXTRA_DEBUG_CFLAGS)
+		DEBUG_CFLAGS+=$(DEBUG_VERIFY_PROFILING_CFLAGS)
 	endif
 	CFLAGS+=$(DEBUG_CFLAGS)
 	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
