@@ -27,7 +27,12 @@
 
 #if _IS_WINDOWS
 #include <windows.h>
+#else
+#include <sys/select.h>
+#include <unistd.h>
 #endif
+
+#define WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS 10
 
 #define UNSET_FRAME_RECORD 9999
 
@@ -77,6 +82,19 @@ void handleTermSignal(int signal) {
 	countAndSetShutdown(true);
 }
 
+/*void handleSegvSignale(int signal) {
+ void *array[20];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 20);
+
+	// print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", signal);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}*/
+
 #if _IS_WINDOWS
 BOOL WINAPI windowsCtrlCHandler(DWORD fdwCtrlType) {
 	switch(fdwCtrlType) {
@@ -99,9 +117,16 @@ void setSignalHandlers() {
 #endif
 }
 	
-int main() {
+int main(size_t argc, char **argv) {
 
-	int cycle_count = 1;
+	int maxLoops = -1;
+	if (argc >= 2) {
+		maxLoops = atoi(argv[1]);
+	} else {
+		fprintf(stderr, "fail parsing");
+		exit(1);
+	}
+
 	current_frame_record = UNSET_FRAME_RECORD;
 	initConfig();
 
@@ -130,9 +155,22 @@ int main() {
 		printf("Could not check version on Github. Please check your internet connection.\n");
 		printf("Otherwise, we can't submit completed roadmaps to the server!\n");
 		printf("Alternatively you may have been rate-limited. Please wait a while and try again.\n");
-		printf("Press ENTER to quit.\n");
-		char exitChar = getchar();
-		return -1;
+#if _IS_WINDOWS
+		printf("Will continue after %d seconds\n", WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS);
+		Sleep(WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS * 1000);
+#else
+		fd_set stdin;
+		FD_SET(STDERR_FILENO, &stdin);
+		printf("Press ENTER to continue (will automatically continue in %d seconds).\n", WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS);
+		struct timeval tv;
+		tv.tv_sec = WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS;
+		tv.tv_usec = 0;
+		int retval = select(1, &stdin, NULL, NULL, &tv);
+		if (retval == -1) {
+			printf("Failure in waiting!\n");
+			return retval;
+		}
+#endif
 	}
 	else if (update == 1) {
 		printf("Please visit https://github.com/SevenChords/CipesAtHome/releases to download the newest version of this program!\n");
@@ -184,17 +222,22 @@ int main() {
 	
 	// Create workerCount threads
 	omp_set_num_threads(workerCount);
+
+	const int maxLoopFixed = maxLoops;
+
 	#pragma omp parallel
 	{
+		long cycle_count = 0;
 		int ID = omp_get_thread_num();
 		
 		// Seed each thread's PRNG for the select and randomise config options
 		srand(((int)time(NULL)) ^ ID);
 		
-		while (1) {
+		while (maxLoopFixed < 0 || cycle_count < maxLoopFixed) {
 			if (askedToShutdown()) {
 				break;
 			}
+			++cycle_count;
 			struct Result result = calculateOrder(ID);
 			
 			// result might store -1 frames for errors that might be recoverable
