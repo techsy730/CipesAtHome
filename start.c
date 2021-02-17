@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <omp.h>
 #include <libconfig.h>
+#include "base.h"
 #include "inventory.h"
 #include "config.h"
 #include "recipes.h"
@@ -18,18 +19,11 @@
 #include <signal.h>
 #include <omp.h>
 #include "absl/base/port.h"
-
-#ifdef _MSC_FULL_VER
-#define _IS_WINDOWS 1
-#else
-#define _IS_WINDOWS 0
-#endif
-
-#if _IS_WINDOWS
-#include <windows.h>
-#else
+#if !_CIPES_IS_WINDOWS
 #include <sys/select.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 #endif
 
 #define WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS 10
@@ -66,14 +60,14 @@ int numTimesExitRequest = 0;
 
 void countAndSetShutdown(bool isSignal) {
 	if (++numTimesExitRequest >= NUM_TIMES_EXITED_BEFORE_HARD_QUIT) {
-		if (!_IS_WINDOWS || !isSignal) {
+		if (!_CIPES_IS_WINDOWS || !isSignal) {
 			printf("\nExit reqested %d times; shutting down now.\n", NUM_TIMES_EXITED_BEFORE_HARD_QUIT);
 		}
 		exit(1);
 	} else {
 		requestShutdown();
-		if (!_IS_WINDOWS || !isSignal) {
-			printf("\nExit requested, finishing up work. Should shutdown soon (CTRL-C 3 times to force exit)\n");
+		if (!_CIPES_IS_WINDOWS || !isSignal) {
+			printf("\nExit requested, finishing up work. Should shutdown soon (CTRL-C %d times total to force exit)\n", NUM_TIMES_EXITED_BEFORE_HARD_QUIT);
 		}
 	}
 }
@@ -95,7 +89,7 @@ void handleTermSignal(int signal) {
   exit(1);
 }*/
 
-#if _IS_WINDOWS
+#if _CIPES_IS_WINDOWS
 BOOL WINAPI windowsCtrlCHandler(DWORD fdwCtrlType) {
 	switch(fdwCtrlType) {
     case CTRL_C_EVENT: ABSL_FALLTHROUGH_INTENDED;
@@ -110,7 +104,7 @@ BOOL WINAPI windowsCtrlCHandler(DWORD fdwCtrlType) {
 void setSignalHandlers() {
 	signal(SIGTERM, handleTermSignal);
 	signal(SIGINT, handleTermSignal);
-#if _IS_WINDOWS
+#if _CIPES_IS_WINDOWS
 	if (!SetConsoleCtrlHandler(windowsCtrlCHandler, TRUE)) {
 		printf("Unable to set CTRL-C handler. CTRL-C may cause unclean shutdown.\n");
 	}
@@ -152,7 +146,7 @@ int main(int argc, char **argv) {
 		printf("Could not check version on Github. Please check your internet connection.\n");
 		printf("Otherwise, we can't submit completed roadmaps to the server!\n");
 		printf("Alternatively you may have been rate-limited. Please wait a while and try again.\n");
-#if _IS_WINDOWS
+#if _CIPES_IS_WINDOWS
 		printf("Will continue after %d seconds\n", WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS);
 		Sleep(WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS * 1000);
 #else
@@ -164,7 +158,7 @@ int main(int argc, char **argv) {
 		tv.tv_usec = 0;
 		int retval = select(1, &stdin, NULL, NULL, &tv);
 		if (retval == -1) {
-			printf("Failure in waiting!\n");
+			printf("Failure in waiting! %d (%s)\n", errno, strerror(errno));
 			return retval;
 		}
 #endif
