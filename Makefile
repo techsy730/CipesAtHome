@@ -7,7 +7,7 @@ OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o 
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
 # Recognized configurable variables:
-# DEBUG=1 Include debug symbols in build
+# DEBUG=1 Include debug symbols in the build and include stack traces (minimal to no impact on performance, just makes the binary bigger)
 # CFLAGS=... : Any additional CFLAGS to be used (are specified after built in CFLAGS)
 # HIGH_OPT_CLFLAGS=... : Any additional CFLAGS to pass to known CPU bottleneck source files
 #   This overrides the default of "-O3" instead of appends to it
@@ -99,6 +99,7 @@ ifeq (1,$(PERFORMANCE_PROFILING))
 	CFLAGS+=-pg
 endif
 ifeq (1,$(PROFILE_GENERATE))
+	DEBUG?=1
 	ifeq (clang,$(COMPILER))
 		CFLAGS+=-fcs-profile-generate=$(PROF_DIR)
 	else ifeq (gcc,$(COMPILER))
@@ -140,7 +141,7 @@ endif
 
 default: $(TARGET)
 
-.PHONY: clean clean_prof make_prof_dir prof_finish
+.PHONY: clean clean_prof prof_clean make_prof_dir prof_finish
 
 make_prof_dir:
 	$(MAKE_PROF_DIR_COMMAND)
@@ -171,4 +172,6 @@ clean_prof:
 	$(RM) -r $(addprefix $(PROF_DIR)/,$(KNOWN_PROFILE_DATA_EXTENSIONS))
 	$(RM) $(CLANG_PROF_MERGED)
 endif
+
+prof_clean: clean_prof
 
