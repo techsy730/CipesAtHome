@@ -53,6 +53,10 @@ typedef struct MoveDescription MoveDescription;
 int **invFrames;
 struct Recipe *recipeList;
 
+// Harmless race; if multiple threads try to initialize this they will
+// all initialize to the same thing.
+static const struct Cook EMPTY_COOK = {0};
+
 ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool checkShutdownOnIndex(int i) {
 	return i % CHECK_SHUTDOWN_INTERVAL == 0 && askedToShutdown();
 }
@@ -1741,6 +1745,7 @@ void reallocateRecipes(struct BranchPath* newRoot, enum Type_Sort* rearranged_re
 		int record_frames = 9999;
 		struct BranchPath *record_placement_node = NULL;
 		struct Cook *record_description = NULL;
+		struct Cook temp_description = {0};
 		
 		// Evaluate all recipes and determine the optimal recipe and location
 		int recipe_index = getIndexOfRecipe(rearranged_recipes[recipe_offset]);
@@ -1772,19 +1777,18 @@ void reallocateRecipes(struct BranchPath* newRoot, enum Type_Sort* rearranged_re
 				// This is a valid recipe and location to fulfill (and toss) the output
 				// Calculate the frames needed to produce this step
 				int temp_frames = TOSS_FRAMES;
-				struct Cook *temp_description = malloc(sizeof(struct Cook));
-				checkMallocFailed(temp_description);
-				temp_description->output = recipe.output;
-				temp_description->handleOutput = Toss;
+				temp_description = EMPTY_COOK;
+				temp_description.output = recipe.output;
+				temp_description.handleOutput = Toss;
 
 				if (combo.numItems == 1) {
 					// Only one ingredient to navigate to
 					temp_frames += invFrames[placement->inventory.length - 1][indexItem1];
-					temp_description->numItems = 1;
-					temp_description->item1 = combo.item1;
-					temp_description->itemIndex1 = indexItem1;
-					temp_description->item2 = -1;
-					temp_description->itemIndex2 = -1;
+					temp_description.numItems = 1;
+					temp_description.item1 = combo.item1;
+					temp_description.itemIndex1 = indexItem1;
+					temp_description.item2 = -1;
+					temp_description.itemIndex2 = -1;
 				}
 				else {
 					_assert_with_stacktrace(indexItem2 != INDEX_ITEM_UNDEFINED);
@@ -1793,23 +1797,23 @@ void reallocateRecipes(struct BranchPath* newRoot, enum Type_Sort* rearranged_re
 					// Pick the larger-index number ingredient first, as it will reduce
 					// the frames needed to reach the other ingredient
 					temp_frames += CHOOSE_2ND_INGREDIENT_FRAMES;
-					temp_description->numItems = 2;
+					temp_description.numItems = 2;
 
 					if (indexItem1 > indexItem2) {
 						temp_frames += invFrames[placement->inventory.length - 1][indexItem1];
 						temp_frames += invFrames[placement->inventory.length - 2][indexItem2];
-						temp_description->item1 = combo.item1;
-						temp_description->itemIndex1 = indexItem1;
-						temp_description->item2 = combo.item2;
-						temp_description->itemIndex2 = indexItem2;
+						temp_description.item1 = combo.item1;
+						temp_description.itemIndex1 = indexItem1;
+						temp_description.item2 = combo.item2;
+						temp_description.itemIndex2 = indexItem2;
 					}
 					else {
 						temp_frames += invFrames[placement->inventory.length - 1][indexItem2];
 						temp_frames += invFrames[placement->inventory.length - 2][indexItem1];
-						temp_description->item1 = combo.item2;
-						temp_description->itemIndex1 = indexItem2;
-						temp_description->item2 = combo.item1;
-						temp_description->itemIndex2 = indexItem1;
+						temp_description.item1 = combo.item2;
+						temp_description.itemIndex1 = indexItem2;
+						temp_description.item2 = combo.item1;
+						temp_description.itemIndex2 = indexItem1;
 					}
 				}
 
@@ -1819,14 +1823,11 @@ void reallocateRecipes(struct BranchPath* newRoot, enum Type_Sort* rearranged_re
 					record_frames = temp_frames;
 					record_placement_node = placement;
 
-					// If we are overwriting a previous record, free the previous description
-					if (record_description != NULL) {
-						free(record_description);
+					if (record_description == NULL) {
+						record_description = malloc(sizeof(struct Cook));
+						checkMallocFailed(record_description);
 					}
-					record_description = temp_description;
-				}
-				else {
-					free(temp_description);
+					copyCook(record_description, &temp_description);
 				}
 			}
 		}
