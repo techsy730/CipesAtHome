@@ -1,5 +1,5 @@
 CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
 TARGET=recipesAtHome
 DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
@@ -7,7 +7,7 @@ OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o 
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
 # Recognized configurable variables:
-# DEBUG=1 Include debug symbols in build
+# DEBUG=1 Include debug symbols in the build and include stack traces (minimal to no impact on performance, just makes the binary bigger)
 # CFLAGS=... : Any additional CFLAGS to be used (are specified after built in CFLAGS)
 # HIGH_OPT_CLFLAGS=... : Any additional CFLAGS to pass to known CPU bottleneck source files
 #   This overrides the default of "-O3" instead of appends to it
@@ -45,23 +45,25 @@ ifeq ($(CC),)
 	IS_CC_EMPTY=1
 endif
 
+DEBUG_EXPLICIT=0
 
-ifneq (,$(filter $(RECOGNIZED_YES), $(USE_LTO)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_LTO)))
 	USE_LTO=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(PROFILE_GENERATE)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(PROFILE_GENERATE)))
 	PROFILE_GENERATE=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(PROFILE_USE)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(PROFILE_USE)))
 	PROFILE_USE=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(PERFORMANCE_PROFILING)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(PERFORMANCE_PROFILING)))
 	PERFORMANCE_PROFILING=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(DEBUG)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG)))
 	DEBUG=1
+	DEBUG_EXPLICIT=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(USE_GOOGLE_PERFTOOLS)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_GOOGLE_PERFTOOLS)))
 	USE_GOOGLE_PERFTOOLS=1
 endif
 
@@ -78,7 +80,7 @@ ifneq ($(IS_CC_EXACTLY_CC) $(IS_CC_EMPTY), 0 0)
 	ifeq ($(UNAME), Darwin)
 		MACPREFIX:=$(shell brew --prefix)
 		CC:=$(MACPREFIX)/opt/llvm/bin/clang
-		CFLAGS:=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib $(CFLAGS)
+		CFLAGS+=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib $(CFLAGS)
 	endif
 endif
 
@@ -115,12 +117,13 @@ ifeq (1,$(USE_LTO))
 endif
 
 ifeq (1,$(PROFILE_GENERATE))
+	DEBUG?=1
 	ifeq (clang,$(COMPILER))
 		CFLAGS+=-fcs-profile-generate=$(PROF_DIR)
+	else ifeq (gcc,$(COMPILER))
+		CFLAGS+=-fprofile-generate=$(PROF_DIR) -fprofile-update=prefer-atomic
 	else
-		ifneq (gcc,$(COMPILER))
-			$(warning Unrecognized compiler "$(CC)". Profile generation might not work, disable "PROFILE_GENERATE" if you get build errors about unrecognized flags)
-		endif
+		$(warning Unrecognized compiler "$(CC)". Profile generation might not work, disable "PROFILE_GENERATE" if you get build errors about unrecognized flags)
 		CFLAGS+=-fprofile-generate=$(PROF_DIR)
 	endif
 endif
@@ -151,11 +154,12 @@ endif
 
 ifeq (1,$(DEBUG))
 	CFLAGS+=$(DEBUG_CFLAGS)
+	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
 endif
 
 default: $(TARGET)
 
-.PHONY: clean clean_prof make_prof_dir prof_finish
+.PHONY: clean clean_prof prof_clean make_prof_dir prof_finish
 
 make_prof_dir:
 	$(MAKE_PROF_DIR_COMMAND)
@@ -186,4 +190,6 @@ clean_prof:
 	$(RM) -r $(addprefix $(PROF_DIR)/,$(KNOWN_PROFILE_DATA_EXTENSIONS))
 	$(RM) $(CLANG_PROF_MERGED)
 endif
+
+prof_clean: clean_prof
 
