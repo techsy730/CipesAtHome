@@ -42,19 +42,19 @@ ifeq ($(CC),)
 endif
 
 
-ifneq (,$(filter $(RECOGNIZED_YES), $(USE_LTO)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_LTO)))
 	USE_LTO=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(PROFILE_GENERATE)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(PROFILE_GENERATE)))
 	PROFILE_GENERATE=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(PROFILE_USE)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(PROFILE_USE)))
 	PROFILE_USE=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(PERFORMANCE_PROFILING)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(PERFORMANCE_PROFILING)))
 	PERFORMANCE_PROFILING=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(DEBUG)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG)))
 	DEBUG=1
 endif
 
