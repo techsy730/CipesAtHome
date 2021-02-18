@@ -41,7 +41,7 @@ extern bool _abrt_from_assert /*= false*/;
 #elif defined(INCLUDE_STACK_TRACES)
 #if __cplusplus >= 201103L // C++11 or greater
 #define _assert_with_stacktrace(condition) ({ \
-  auto _condition = (condition); \
+  auto _condition = ABSL_PREDICT_TRUE((condition)_; \
   if (!_condition) { \
   	_abrt_from_assert = true; \
   	printStackTraceF(stderr); \
@@ -50,7 +50,7 @@ extern bool _abrt_from_assert /*= false*/;
 })
 #elif SUPPORTS_AUTOTYPE
 #define _assert_with_stacktrace(condition) ({ \
-  __auto_type _condition = (condition); \
+  __auto_type _condition = ABSL_PREDICT_TRUE((condition)); \
   if (!_condition) { \
   	_abrt_from_assert = true; \
   	printStackTraceF(stderr); \
@@ -59,7 +59,7 @@ extern bool _abrt_from_assert /*= false*/;
 })
 #elif SUPPORTS_TYPEOF
 #define _assert_with_stacktrace(condition) ({ \
-  typeof(condition) _condition = (condition); \
+  typeof(condition) _condition = ABSL_PREDICT_TRUE((condition)); \
   if (!_condition) { \
   	_abrt_from_assert = true; \
   	printStackTraceF(stderr); \
@@ -68,7 +68,7 @@ extern bool _abrt_from_assert /*= false*/;
 })
 #else
 #define _assert_with_stacktrace(condition) ({ \
-  if (!(condition)) { \
+  if (! ABSL_PREDICT_TRUE((condition))) { \
   	_abrt_from_assert = true; \
   	printStackTraceF(stderr); \
   	assert((condition)); \
