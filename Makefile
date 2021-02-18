@@ -1,5 +1,5 @@
 CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
 HIGH_OPT_CFLAGS?=-O3
 TARGET=recipesAtHome
 DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h $(wildcard absl/base/*.h)
@@ -41,6 +41,7 @@ ifeq ($(CC),)
 	IS_CC_EMPTY=1
 endif
 
+DEBUG_EXPLICIT=0
 
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_LTO)))
 	USE_LTO=1
@@ -56,6 +57,7 @@ ifneq (,$(filter $(RECOGNIZED_TRUE), $(PERFORMANCE_PROFILING)))
 endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG)))
 	DEBUG=1
+	DEBUG_EXPLICIT=1
 endif
 
 
@@ -71,7 +73,7 @@ ifneq ($(IS_CC_EXACTLY_CC) $(IS_CC_EMPTY), 0 0)
 	ifeq ($(UNAME), Darwin)
 		MACPREFIX:=$(shell brew --prefix)
 		CC:=$(MACPREFIX)/opt/llvm/bin/clang
-		CFLAGS:=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib $(CFLAGS)
+		CFLAGS+=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib $(CFLAGS)
 	endif
 endif
 
@@ -133,6 +135,7 @@ endif
 
 ifeq (1,$(DEBUG))
 	CFLAGS+=$(DEBUG_CFLAGS)
+	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
 endif
 
 default: $(TARGET)
