@@ -1,4 +1,4 @@
-CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -I . -O2 $(CFLAGS)
+CFLAGS:=-lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic -DINCLUDE_STACK_TRACES=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
