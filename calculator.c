@@ -154,7 +154,7 @@ void copyCook(struct Cook *cookNew, struct Cook *cookOld) {
  * Outputs	: 
  * A simple memcpy to duplicate oldOutputsFulfilled to a new array
  -------------------------------------------------------------------*/
-int *copyOutputsFulfilled(int *oldOutputsFulfilled) {
+ABSL_MUST_USE_RESULT_INCLUSIVE int *copyOutputsFulfilled(int *oldOutputsFulfilled) {
 	int *newOutputsFulfilled = malloc(sizeof(int) * NUM_RECIPES);
 
 	checkMallocFailed(newOutputsFulfilled);
@@ -177,7 +177,7 @@ int *copyOutputsFulfilled(int *oldOutputsFulfilled) {
  * lateSort tracks whether we performed the sort before or after the
  * Keel Mango, for printing purposes
  -------------------------------------------------------------------*/
-struct CH5 *createChapter5Struct(struct CH5_Eval eval, int lateSort) {
+ABSL_MUST_USE_RESULT_INCLUSIVE struct CH5 *createChapter5Struct(struct CH5_Eval eval, int lateSort) {
 	struct CH5 *ch5 = malloc(sizeof(struct CH5));
 
 	checkMallocFailed(ch5);
@@ -1780,6 +1780,8 @@ void reallocateRecipes(struct BranchPath* newRoot, enum Type_Sort* rearranged_re
 					temp_description->itemIndex2 = -1;
 				}
 				else {
+					_assert_with_stacktrace(ABSL_PREDICT_TRUE(indexItem2 != INDEX_ITEM_UNDEFINED));
+				
 					// Two ingredients to navigate to, but order matters
 					// Pick the larger-index number ingredient first, as it will reduce
 					// the frames needed to reach the other ingredient
@@ -2228,14 +2230,18 @@ void logIterations(int ID, int stepIndex, struct BranchPath * curNode, long iter
  * a roadmap is found, the data is printed to a .txt file, and the result
  * is passed back to start.c to try submitting to the server.
  -------------------------------------------------------------------*/
-struct Result calculateOrder(int ID) {
+struct Result calculateOrder(int ID, long max_branches) {
+	if (!cook_container_pool_init) {
+		cook_container_pool = init_cook_container_pool_state();
+		cook_container_pool_init = true;
+	}
 	int randomise = getConfigInt("randomise");
 	int select = getConfigInt("select");
 	int debug = getConfigInt("debug");
 	// The user may disable all randomization but not be debugging.
 	int freeRunning = !debug && !randomise && !select;
 	int branchInterval = getConfigInt("branchLogInterval");
-	int total_dives = 0;
+	long total_dives = 0;
 	struct BranchPath *curNode = NULL; // Deepest node at any particular point
 	struct BranchPath *root;
 	
@@ -2250,6 +2256,10 @@ struct Result calculateOrder(int ID) {
 		long iterationCount = 0;
 		long iterationLimit = DEFAULT_ITERATION_LIMIT;
 
+		if (max_branches > 0 && total_dives >= max_branches) {
+			break;
+		}
+
 		// Create root of tree path
 		curNode = initializeRoot();
 		root = curNode; // Necessary when printing results starting from root
@@ -2258,9 +2268,9 @@ struct Result calculateOrder(int ID) {
 
 		if (total_dives % branchInterval == 0 && will_log_level(NEW_BRANCH_LOG_LEVEL)) {
 			char temp1[30];
-			char temp2[30];
+			char temp2[50];
 			sprintf(temp1, "Call %d", ID);
-			sprintf(temp2, "Searching New Branch %d", total_dives);
+			sprintf(temp2, "Searching New Branch %zu", total_dives);
 			recipeLog(NEW_BRANCH_LOG_LEVEL, "Calculator", "Info", temp1, temp2);
 		}
 
@@ -2535,3 +2545,4 @@ struct Result calculateOrder(int ID) {
 	// Unexpected break out of loop. Return the nothing results.
 	return (struct Result) { -1, -1 };
 }
+
