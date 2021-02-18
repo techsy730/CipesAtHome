@@ -16,6 +16,7 @@
 #include <omp.h>
 #include "absl/base/port.h"
 
+// These model Paper Mario TTYD game behavior. Do not edit these.
 #define NUM_RECIPES 58 			// Including Chapter 5 representation
 #define CHOOSE_2ND_INGREDIENT_FRAMES 56 	// Penalty for choosing a 2nd item
 #define TOSS_FRAMES 32				// Penalty for having to toss an item
