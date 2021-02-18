@@ -16,6 +16,32 @@
 #endif
 #endif
 
+#ifdef INCLUDE_STACK_TRACES
+ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f);
+#else
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline printStackTraceF(FILE* f) {}
+#endif
+
+ /*-------------------------------------------------------------------
+ * Function 	: checkMallocFailed
+ * Inputs	: void* p
+ *
+ * This function tests whether malloc failed to allocate (usually due
+ * to lack of heap space), checked by giving the just malloc'ed pointer, p,
+ * to this function.
+ * If it was NULL, then this function will print an error message and
+ * exit the program with a failure status.
+ -------------------------------------------------------------------*/
+inline void checkMallocFailed(const void* const p) {
+	if (ABSL_PREDICT_FALSE(p == NULL)) {
+		fprintf(stderr, "Fatal error! Ran out of heap memory.\n");
+		fprintf(stderr, "Press enter to quit.\n");
+		printStackTraceF(stderr);
+		ABSL_ATTRIBUTE_UNUSED char exitChar = getchar();
+		exit(1);
+	}
+}
+
 extern bool _abrt_from_assert /*= false*/;
 
 #define STACK_TRACE_FRAMES 15
@@ -118,28 +144,6 @@ extern bool _abrt_from_assert /*= false*/;
 #else
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
 #endif
-
-ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f);
- 
- /*-------------------------------------------------------------------
- * Function 	: checkMallocFailed
- * Inputs	: void* p
- *
- * This function tests whether malloc failed to allocate (usually due
- * to lack of heap space), checked by giving the just malloc'ed pointer, p,
- * to this function.
- * If it was NULL, then this function will print an error message and
- * exit the program with a failure status.
- -------------------------------------------------------------------*/
-inline void checkMallocFailed(const void* const p) {
-	if (ABSL_PREDICT_FALSE(p == NULL)) {
-		fprintf(stderr, "Fatal error! Ran out of heap memory.\n");
-		fprintf(stderr, "Press enter to quit.\n");
-		printStackTraceF(stderr);
-		ABSL_ATTRIBUTE_UNUSED char exitChar = getchar();
-		exit(1);
-	}
-}
 
 // _MSC_VER == 1400 is Visual Studio 2005
 #if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || (defined(__GNUC__) && __GNUC__ > 3) || defined(__clang__) || (defined(_MSC_VER) && _MSC_VER >= 1400)

@@ -4,8 +4,8 @@
 extern inline void checkMallocFailed(const void* const p);
 bool _abrt_from_assert = false;
 
-ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f) {
 #ifdef INCLUDE_STACK_TRACES
+ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f) {
 #pragma omp critical(stack_trace)
 	{
 #ifdef __GLIBC__ // Sorely lacking, but hopefully should work good enough.
@@ -36,7 +36,9 @@ ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f) {
 #endif
 	fail: ;
 	}
-
 	return;
-#endif
 }
+#else
+ABSL_FORCE_ALWAYS_INLINE extern inline void printStackTraceF(FILE* f);
+#endif
+
