@@ -2231,10 +2231,6 @@ void logIterations(int ID, int stepIndex, struct BranchPath * curNode, long iter
  * is passed back to start.c to try submitting to the server.
  -------------------------------------------------------------------*/
 struct Result calculateOrder(int ID, long max_branches) {
-	if (!cook_container_pool_init) {
-		cook_container_pool = init_cook_container_pool_state();
-		cook_container_pool_init = true;
-	}
 	int randomise = getConfigInt("randomise");
 	int select = getConfigInt("select");
 	int debug = getConfigInt("debug");
