@@ -1,5 +1,5 @@
-CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -DINCLUDE_STACK_TRACES=1 -rdynamic
+CFLAGS:=-lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -I . -O2 $(CFLAGS)
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic -DINCLUDE_STACK_TRACES=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
 TARGET=recipesAtHome
@@ -28,7 +28,7 @@ HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 #   For Ubuntu, you need to install the packages
 #     google-perftools, libgoogle-perftools-dev
 
-RECOGNIZED_YES=1 true True TRUE yes Yes YES on On ON
+RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
 
 LLVM_PROFDATA?=llvm-profdata
 PROF_DIR?=prof
@@ -50,26 +50,26 @@ endif
 
 DEBUG_EXPLICIT=0
 
-ifneq (,$(filter $(RECOGNIZED_YES), $(USE_LTO)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_LTO)))
 	USE_LTO=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(PROFILE_GENERATE)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(PROFILE_GENERATE)))
 	PROFILE_GENERATE=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(PROFILE_USE)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(PROFILE_USE)))
 	PROFILE_USE=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(PERFORMANCE_PROFILING)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(PERFORMANCE_PROFILING)))
 	PERFORMANCE_PROFILING=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(DEBUG)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG)))
 	DEBUG=1
 	DEBUG_EXPLICIT=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(DEBUG_VERIFY_PROFILING)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG_VERIFY_PROFILING)))
 	DEBUG_VERIFY_PROFILING=1
 endif
-ifneq (,$(filter $(RECOGNIZED_YES), $(USE_GOOGLE_PERFTOOLS)))
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_GOOGLE_PERFTOOLS)))
 	USE_GOOGLE_PERFTOOLS=1
 endif
 
@@ -101,11 +101,11 @@ endif
 ifeq (1,$(USE_GOOGLE_PERFTOOLS))
 	ifeq (1,$(PERFORMANCE_PROFILING))
 		DEBUG?=1
-		CFLAGS+=-ltcmalloc_and_profiler
+		CFLAGS:=-ltcmalloc_and_profiler $(CFLAGS)
 	else ifeq (1,$(DEBUG))
-		CFLAGS+=-ltcmalloc
+		CFLAGS:=-ltcmalloc $(CFLAGS)
 	else
-		CFLAGS+=-ltcmalloc_minimal
+		CFLAGS:=-ltcmalloc_minimal $(CFLAGS)
 	endif
 else
 	ifeq (1,$(PERFORMANCE_PROFILING))
