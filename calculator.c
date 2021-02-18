@@ -35,6 +35,9 @@
 
 #define CHECK_SHUTDOWN_INTERVAL 200
 
+
+#define INDEX_ITEM_UNDEFINED -1
+
 #define NOISY_DEBUG_FLAG 0
 // Only uncomment the below if you are really using NOISY_DEBUG_FLAG
 //#if NOISY_DEBUG_FLAG
@@ -213,7 +216,7 @@ MoveDescription createCookDescription(struct BranchPath *node, struct Recipe rec
 	MoveDescription useDescription;
 	useDescription.action = Cook;
 	
-	int ingredientLoc[2] = {INT_MIN, INT_MIN};
+	int ingredientLoc[2] = {INDEX_ITEM_UNDEFINED, INDEX_ITEM_UNDEFINED};
 	
 	// Determine the locations of both ingredients
 	ingredientLoc[0] = indexOfItemInInventory(*tempInventory, combo.item1);
@@ -1722,8 +1725,6 @@ void printSortData(FILE *fp, enum Action curNodeAction) {
 			fputs("ERROR IN HANDLING OF SORT", fp);
 	};
 }
-
-#define INDEX_ITEM_UNDEFINED INT_MIN
 
 /*-------------------------------------------------------------------
  * Function : reallocateRecipes
