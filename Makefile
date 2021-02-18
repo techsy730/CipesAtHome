@@ -1,6 +1,6 @@
-CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -DINCLUDE_STACK_TRACES=1
-DEBUG_VERIFY_PROFILING_CFLAGS?=-rdynamic -fsanitize=address
+CFLAGS:= -lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -I . -O2 $(CFLAGS)
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -DINCLUDE_STACK_TRACES=1 -rdynamic
+DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
 TARGET=recipesAtHome
 DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
@@ -162,7 +162,7 @@ endif
 ifeq (1,$(DEBUG))
 	ifeq (1,$(DEBUG_VERIFY_PROFILING))
 		ifeq (gcc 0,$(COMPILER) $(USE_GOOGLE_PERFTOOLS))
-			DEBUG_VERIFY_PROFILING_CFLAGS+=-static-libasan
+			DEBUG_VERIFY_PROFILING_CFLAGS+=-static-libasan -fsanitize=address
 		endif
 		DEBUG_CFLAGS+=$(DEBUG_VERIFY_PROFILING_CFLAGS)
 	endif

@@ -6,13 +6,19 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "absl/base/port.h"
+#include <assert.h>
 
 #ifdef INCLUDE_STACK_TRACES
 #ifdef __GLIBC__ // Sorely lacking, but hopefully should work good enough.
 #include <execinfo.h>
 #endif
 #endif
+
+extern bool _abrt_from_assert /*= false*/;
+
+#define STACK_TRACE_FRAMES 15
 
 #if defined(_MSC_FULL_VER) || defined(_MSC_VER)
 #define _CIPES_IS_WINDOWS 1
@@ -29,11 +35,55 @@
 #define SUPPORTS_AUTOTYPE 1
 #endif
 
+#ifdef NDEBUG
+// To force the semicolon
+#define _assert_with_stacktrace(condition) do {} while(0)
+#elif defined(INCLUDE_STACK_TRACES)
+#if __cplusplus >= 201103L // C++11 or greater
+#define _assert_with_stacktrace(condition) ({ \
+  auto _condition = (condition); \
+  if (!_condition) { \
+  	_abrt_from_assert = true; \
+  	printStackTraceF(stderr); \
+  	assert((condition)); \
+	} \
+})
+#elif SUPPORTS_AUTOTYPE
+#define _assert_with_stacktrace(condition) ({ \
+  __auto_type _condition = (condition); \
+  if (!_condition) { \
+  	_abrt_from_assert = true; \
+  	printStackTraceF(stderr); \
+  	assert((condition)); \
+  } \
+})
+#elif SUPPORTS_TYPEOF
+#define _assert_with_stacktrace(condition) ({ \
+  typeof(condition) _condition = (condition); \
+  if (!_condition) { \
+  	_abrt_from_assert = true; \
+  	printStackTraceF(stderr); \
+  	assert((condition)); \
+	} \
+})
+#else
+#define _assert_with_stacktrace(condition) ({ \
+  if (!(condition)) { \
+  	_abrt_from_assert = true; \
+  	printStackTraceF(stderr); \
+  	assert((condition)); \
+	} \
+})
+#endif
+#else
+#define _assert_with_stacktrace(condition) assert((condition))
+#endif
+
 // MAX is NOT assured to not repeat side effects; x and y MUST be side effect free.
 #if __cplusplus >= 201103L // C++11 or greater
 #define MAX(x,y) ({ \
-	decltype((x)) _x = (x); \
-	decltype((y)) _y = (y); \
+	auto _x = (x); \
+	auto _y = (y); \
 	_x > _y ?	_x : _y;})
 #elif SUPPORTS_AUTOTYPE
 #define MAX(x,y) ({ \
@@ -69,30 +119,7 @@
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
 #endif
 
-
-#define STACK_TRACE_FRAMES 15
-
-inline void printStackTraceF(FILE* f) {
-#ifdef INCLUDE_STACK_TRACES
-#ifdef __GLIBC__ // Sorely lacking, but hopefully should work good enough.
-  void *array[STACK_TRACE_FRAMES];
-  size_t size;
-
-  // get void*'s for all entries on the stack
-  size = backtrace(array, STACK_TRACE_FRAMES);
-
-  char** backtrace_output = backtrace_symbols(array, size);
-  if (backtrace_output == NULL) {
-  	fprintf(f, "Unable to gather data for stack trace.\n");
-  	return;
-	}
-  fprintf(f, "%s\n", *backtrace_output);
-  free(backtrace_output);
-#else
-  fprintf(f, "Unable to gather data for stack trace (unsupported platform).\n");
-#endif
-#endif
-}
+ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f);
  
  /*-------------------------------------------------------------------
  * Function 	: checkMallocFailed

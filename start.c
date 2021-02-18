@@ -72,8 +72,16 @@ void countAndSetShutdown(bool isSignal) {
 	}
 }
 
-void handleTermSignal(int signal) {
+void handleTermSignal(int signum) {
 	countAndSetShutdown(true);
+}
+
+void handleAbrtSignal(int signum) {
+	if (signum != SIGABRT || (!_abrt_from_assert && signum == SIGABRT)) {
+		printStackTraceF(stderr);
+	}
+	signal(signum, SIG_DFL);
+	raise(signum);
 }
 
 /*void handleSegvSignale(int signal) {
@@ -104,6 +112,15 @@ BOOL WINAPI windowsCtrlCHandler(DWORD fdwCtrlType) {
 void setSignalHandlers() {
 	signal(SIGTERM, handleTermSignal);
 	signal(SIGINT, handleTermSignal);
+	signal(SIGABRT, handleAbrtSignal);
+	signal(SIGSEGV, handleAbrtSignal);
+	signal(SIGILL, handleAbrtSignal);
+#ifdef SIGQUIT
+	signal(SIGQUIT, handleAbrtSignal);
+#endif
+#ifdef SIGSYS
+	signal(SIGSYS, handleAbrtSignal);
+#endif
 #if _CIPES_IS_WINDOWS
 	if (!SetConsoleCtrlHandler(windowsCtrlCHandler, TRUE)) {
 		printf("Unable to set CTRL-C handler. CTRL-C may cause unclean shutdown.\n");
@@ -113,10 +130,17 @@ void setSignalHandlers() {
 	
 int main(int argc, char **argv) {
 
-	int maxLoops = -1;
+	int max_outer_loops = -1;
+	long max_branches = -1;
 	if (argc >= 2) {
-		maxLoops = atoi(argv[1]);
+		max_branches = atoi(argv[1]);
+		if (argc >= 3) {
+			max_outer_loops = atoi(argv[2]);
+		}
 	}
+
+	printf("Welcome to Recipes@Home!\n");
+	printf("Leave this program running as long as you want to search for new recipe orders.\n");
 
 	current_frame_record = UNSET_FRAME_RECORD;
 	initConfig();
@@ -129,18 +153,6 @@ int main(int argc, char **argv) {
 	init_level_cfg();
 	curl_global_init(CURL_GLOBAL_DEFAULT);	// Initialize libcurl
 	int update = checkForUpdates(local_ver);
-	
-	// Greeting message to user
-	printf("Welcome to Recipes@Home!\n");
-	printf("Leave this program running as long as you want to search for new recipe orders.\n");
-	int blob_record = getFastestRecordOnBlob();
-	if (blob_record == 0) {
-		printf("There was an error contacting the server to retrieve the fastest time.\n");
-		printf("Please check your internet connection, but we'll continue for now.\n");
-	}
-	else {
-		printf("The current fastest record is %d frames. Happy cooking!\n", blob_record);
-	}
 	
 	if (update == -1) {
 		printf("Could not check version on Github. Please check your internet connection.\n");
@@ -179,6 +191,16 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
+	// Greeting message to user
+	int blob_record = getFastestRecordOnBlob();
+	if (blob_record == 0) {
+		printf("There was an error contacting the server to retrieve the fastest time.\n");
+		printf("Please check your internet connection, but we'll continue for now.\n");
+	}
+	else {
+		printf("The current fastest record is %d frames.\n", blob_record);
+	}
+
 	// Verify that the results folder exists
 	// If not, create the directory
 	mkdir("./results", 0777);
@@ -199,6 +221,10 @@ int main(int argc, char **argv) {
 			}
 		}
 		fclose(fp);
+		if (current_frame_record < UNSET_FRAME_RECORD) {
+			printf("Your current PB is %d frames.\n", current_frame_record);
+		}
+		printf("Happy cooking!\n");
 
 		// Submit the user's fastest roadmap to the server for leaderboard purposes
 	}
@@ -214,28 +240,35 @@ int main(int argc, char **argv) {
 	// Create workerCount threads
 	omp_set_num_threads(workerCount);
 
-	const int maxLoopFixed = maxLoops;
+	// copying to const so OpenMP knows it doesn't have to have each thread
+	// recheck this.
+	const int max_outer_loops_fixed = max_outer_loops;
+	const long max_branches_fixed = max_branches;
 
 	#pragma omp parallel
 	{
 		long cycle_count = 0;
 		int ID = omp_get_thread_num();
 		
+		printf("[Thread %d][Started]\n", ID);
+		
 		// Seed each thread's PRNG for the select and randomise config options
 		srand(((int)time(NULL)) ^ ID);
 		
-		while (maxLoopFixed < 0 || cycle_count < maxLoopFixed) {
+		while (max_outer_loops_fixed < 0 || cycle_count < max_outer_loops_fixed) {
 			if (askedToShutdown()) {
 				break;
 			}
 			++cycle_count;
-			struct Result result = calculateOrder(ID);
+			struct Result result = calculateOrder(ID, max_branches_fixed);
 			
 			// result might store -1 frames for errors that might be recoverable
 			if (result.frames > -1) {
 				testRecord(result.frames);
 			}
 		}
+
+		printf("[Thread %d][Done]\n", ID);
 	}
 	
 	return 0;
