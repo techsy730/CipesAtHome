@@ -1,11 +1,24 @@
+# Warning, a reminder that 'make' is VERY HOSTILE to paths with spaces (separating argument parameters with spaces is fine).
+# Not even escaping the space with "\ " will fix it.
+# Just don't.
+
+# PUT CONFIGURATION VARIABLES BEFORE THE make CALL (as environment variables for make)!
+# Putting them after the make call (as arguments to make) causes make to IGNORE any changes we try to do.
+# We do a LOT of heavy post processing of these flags, and will cause things to break horrifically if not able to.
+
 CFLAGS:=-lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic -DINCLUDE_STACK_TRACES=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
 TARGET=recipesAtHome
-DEPS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
+HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
+
+# Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
+DEPDIR?=.deps
+# gcc, clang, and icc all recognize this syntax
+GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 
 # Recognized configurable variables:
 # DEBUG=1 Include debug symbols in the build and include stack traces (minimal to no impact on performance, just makes the binary bigger)
@@ -27,6 +40,15 @@ HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 #   Use Google's perftools (and malloc implementation).
 #   For Ubuntu, you need to install the packages
 #     google-perftools, libgoogle-perftools-dev
+# USE_DEPENDENCY_FILES=1
+#   Use the dependency file generation logic to only include headers needed by every C file to trigger a recompilation.
+#   This requires generating Makefile snippet .d files under DEPDIR
+#   Adds DEPFLAGS to the CFLAGS if true
+#   If unset (or empty), this will be automatically chosen based on the compiler used.
+#   If set to false (whether explicit or automatically), when any header file change will trigger recompilation of all source files.
+# DEP_FLAGS
+#   Add these flags to the CFLAGS to generate dependency files.
+#   If unset, this will be automatically chosen based on the compiler used. 
 
 RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
 
@@ -37,7 +59,7 @@ CLANG_PROF_MERGED?=$(TARGET).profdata
 # .gcda and .gcno from GCC
 # .profraw and .profdata from clang
 # .dpi from ICC
-KNOWN_PROFILE_DATA_EXTENSIONS=*.gcda *.gcno *.profraw *.profdata *.dpi
+KNOWN_PROFILE_DATA_EXTENSIONS=*.gcda *.gcno *.profraw *.profdata *.dpi 
 
 IS_CC_EXACTLY_CC=0
 ifeq ($(CC),cc)
@@ -72,6 +94,9 @@ endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_GOOGLE_PERFTOOLS)))
 	USE_GOOGLE_PERFTOOLS=1
 endif
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_DEPENDENCY_FILES)))
+	USE_DEPENDENCY_FILES=1
+endif
 
 
 ifeq ($(PROFILE_GENERATE) $(PROFILE_USE), 1 1)
@@ -90,10 +115,14 @@ ifneq ($(IS_CC_EXACTLY_CC) $(IS_CC_EMPTY), 0 0)
 	endif
 endif
 
-ifneq (,$(findstring gcc,$(CC)))
+ifneq (,$(findstring gcc, $(CC)))
+	COMPILER=gcc
+else ifneq (,$(findstring g++, $(CC)))
 	COMPILER=gcc
 else ifneq (,$(findstring clang,$(CC)))
 	COMPILER=clang
+else ifneq (,$(filter icc icl icpc icx, $(CC)))
+	COMPILER=icc
 else
 	COMPILER=unknown
 endif
@@ -112,6 +141,39 @@ else
 		DEBUG?=1
 		CFLAGS+=-pg
 	endif
+endif
+
+ifeq ($(COMPILER), $(filter gcc clang icc, $(COMPILER)))
+_RECOGNIZES_STANDARD_DEPFLAGS:=1
+endif
+
+ifeq (,$(USE_DEPENDENCY_FILES))
+	ifneq (,$(_RECOGNIZES_STANDARD_DEPFLAGS))
+		USE_DEPENDENCY_FILES=1
+	endif
+endif
+ifeq (1,$(USE_DEPENDENCY_FILES))
+	ifneq (,$(_RECOGNIZES_STANDARD_DEPFLAGS))
+		DEP_FLAGS?=$(GCC_SYNTAX_DEP_FLAGS)
+	endif
+	ifeq (,$(DEP_FLAGS))
+		$(warning DEP_FLAGS is empty, but USE_DEPENDENCY_FILES=1; this will probably fail)
+	endif
+	DEPS:=$(DEPDIR)/%.d
+	ifeq (,$(DEPDIR))
+		MAKE_DEPDIR_COMMAND:=
+	else ifeq (.,$(DEPDIR))
+		MAKE_DEPDIR_COMMAND:=	
+	else ifeq (./,$(DEPDIR))
+		MAKE_DEPDIR_COMMAND:=
+	else ifeq (.\,$(DEPDIR))
+		MAKE_DEPDIR_COMMAND:=
+	else
+		MAKE_DEPDIR_COMMAND:=@mkdir -p $(DEPDIR)
+	endif
+else
+	DEPS:=$(HEADERS)
+	MAKE_DEPDIR_COMMAND:=
 endif
 
 ifeq (1,$(USE_LTO))
@@ -172,28 +234,71 @@ endif
 
 default: $(TARGET)
 
-.PHONY: clean clean_prof prof_clean make_prof_dir prof_finish
+.PHONY: clean clean_prof prof_clean make_dep_dir make_prof_dir prof_finish
 
-make_prof_dir:
+ifeq (,$(MAKE_DEPDIR_COMMAND))
+make_dep_dir: ;
+# $(MAKE_DEPDIR_COMMAND)
+else
+$(DEPDIR):
+	$(info $(MAKE_DEPDIR_COMMAND))
+	$(MAKE_DEPDIR_COMMAND)
+make_dep_dir: $(DEPDIR)
+endif
+
+ifeq (,$(MAKE_PROF_DIR_COMMAND))
+make_prof_dir: ;
+else
+$(PROF_DIR):
 	$(MAKE_PROF_DIR_COMMAND)
+make_prof_dir: $(PROF_DIR)
+endif
 	
 prof_finish:
 	$(PROF_FINISH_COMMAND)
 
-$(HIGH_PERF_OBJS): %.o: %.c $(DEPS) | prof_finish
-	$(CC) $(CFLAGS) $(HIGH_OPT_CFLAGS) -c -o $@ $<
+# Delete the default c compile rules
+%.o : %.c
 
-%.o: %.c $(DEPS) | prof_finish
-	$(CC) $(CFLAGS) -c -o $@ $<
+$(HIGH_PERF_OBJS): %.o: %.c $(DEPS) | prof_finish make_dep_dir
+	$(CC) $(DEP_FLAGS) $(CFLAGS) $(HIGH_OPT_CFLAGS) -c -o $@ $<
+
+%.o: %.c $(DEPS) | prof_finish make_dep_dir
+	$(CC) $(DEP_FLAGS) $(CFLAGS) -c -o $@ $<
 
 $(TARGET): $(OBJ) | make_prof_dir prof_finish
 	$(CC) $(CFLAGS) $(HIGH_OPT_CFLAGS) -o $@ $^
 
+ifeq (,$(DEPDIR))
+_DEPDIR_LOCATION=.
+else
+_DEPDIR_LOCATION=$(DEPDIR)
+endif
+DEPFILES:=$(patsubst %.c,$(_DEPDIR_LOCATION)/%.d,$(wildcard *.c))
+
+# Have make ignore uncreated dep files if not generated yet
+# If they are generated, the include $(wildcard $(DEPFILES)) will overwrite these rules.
+$(DEPFILES):
+
 clean:
 	$(RM) ./*.o
 	$(RM) ./$(TARGET)
+	$(RM) ./*.d
+	$(RM) ./$(DEPDIR)/*.d
 
-ifeq (.,$(PROF_DIR))
+_DO_REDUCED_CLEAN_PROF=0
+ifeq (,$(PROF_DIR))
+_DO_REDUCED_CLEAN_PROF=1
+else ifeq (.,$(PROF_DIR))
+_DO_REDUCED_CLEAN_PROF=1
+else ifeq (./,$(PROF_DIR))
+_DO_REDUCED_CLEAN_PROF=1
+else ifeq (.\,$(PROF_DIR))
+_DO_REDUCED_CLEAN_PROF=1
+endif
+
+
+ifeq (1,_DO_REDUCED_CLEAN_PROF)
 clean_prof:
 	$(RM) $(addprefix ./,$(KNOWN_PROFILE_DATA_EXTENSIONS))
 	$(RM) $(CLANG_PROF_MERGED)
@@ -206,3 +311,4 @@ endif
 
 prof_clean: clean_prof
 
+include $(wildcard $(DEPFILES))

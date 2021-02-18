@@ -150,17 +150,8 @@ void applyJumpStorageFramePenalty(struct BranchPath *node) {
 	return;
 }
 
-/*-------------------------------------------------------------------
- * Function 	: copyCook
- * Inputs	: struct Cook *cookNew
- *		  struct Cook *cookOld
- * 
- * A simple function to copy the data within cookOld to cookNew.
- -------------------------------------------------------------------*/
-void copyCook(struct Cook *cookNew, struct Cook *cookOld) {
-	*cookNew = *cookOld;
-	return;
-}
+// This defines it, but the body is in the header for inlining.
+ABSL_ATTRIBUTE_ALWAYS_INLINE extern inline void copyCook(struct Cook *cookNew, struct Cook *cookOld);
 
 /*-------------------------------------------------------------------
  * Function 	: copyOutputsFulfilled
