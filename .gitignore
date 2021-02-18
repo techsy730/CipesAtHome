@@ -8,11 +8,13 @@ recipes.log
 *.ipch
 *.db
 *.o
+*.d
 *.gcda
 *.gcno
 *.profraw
 *.profdata
 *.dpi
+**/*.d
 **/*.gcda
 **/*.gcno
 **/*.profraw
