@@ -44,6 +44,14 @@
 
 #define INDEX_ITEM_UNDEFINED -1
 
+// Only GCC can assure that floating point constant expressions can be evaluated at compile time.
+#if defined(__GNUC__) && !defined(__clang__)
+_CIPES_STATIC_ASSERT(CAPACITY_DECREASE_THRESHOLD <= CAPACITY_DECREASE_FACTOR, "The decrease threshold must be <= the decrease factor");
+_CIPES_STATIC_ASSERT(CAPACITY_INCREASE_FACTOR >= 1, "The increase factor must be >= 1");
+#endif
+_CIPES_STATIC_ASSERT(DEFAULT_CAPACITY_FOR_EMPTY > 0, "The default capacity must be > 0");
+_CIPES_STATIC_ASSERT(CAPACITY_DECREASE_FLOOR > 0, "The floor for capacity must be > 0");
+
 #define NOISY_DEBUG_FLAG 0
 // Only uncomment the below if you are really using NOISY_DEBUG_FLAG
 //#if NOISY_DEBUG_FLAG
@@ -65,11 +73,13 @@ struct Recipe *recipeList;
 // all initialize to the same thing.
 static const struct Cook EMPTY_COOK = {0};
 
-ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool checkShutdownOnIndex(int i) {
+ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
+static inline bool checkShutdownOnIndex(int i) {
 	return i % CHECK_SHUTDOWN_INTERVAL == 0 && askedToShutdown();
 }
 
-ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool prefetchShutdownOnIndex(int i) {
+ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
+static inline bool prefetchShutdownOnIndex(int i) {
 	if (i % CHECK_SHUTDOWN_INTERVAL == (CHECK_SHUTDOWN_INTERVAL - 1)) {
 		prefetchShutdown();
 		return true;
@@ -77,7 +87,8 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool prefetchShutdownOnIndex(int i) {
 	return false;
 }
 
-ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool checkShutdownOnIndexWithPrefetch(int i) {
+ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
+static inline bool checkShutdownOnIndexWithPrefetch(int i) {
 	int modulo = i % CHECK_SHUTDOWN_INTERVAL;
 	switch (modulo) {
 		case 0:
@@ -90,11 +101,13 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool checkShutdownOnIndexWithPrefetch
 	}
 }
 
-ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool checkShutdownOnIndexLong(long i) {
+ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
+static inline bool checkShutdownOnIndexLong(long i) {
 	return i % CHECK_SHUTDOWN_INTERVAL == 0 && askedToShutdown();
 }
 
-ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool prefetchShutdownOnIndexLong(long i) {
+ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
+static inline bool prefetchShutdownOnIndexLong(long i) {
 	if (i % CHECK_SHUTDOWN_INTERVAL == (CHECK_SHUTDOWN_INTERVAL - 1)) {
 		prefetchShutdown();
 		return true;
@@ -102,7 +115,8 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool prefetchShutdownOnIndexLong(long
 	return false;
 }
 
-ABSL_ATTRIBUTE_ALWAYS_INLINE static inline bool checkShutdownOnIndexLongWithPrefetch(long i) {
+ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
+static inline bool checkShutdownOnIndexLongWithPrefetch(long i) {
 	int modulo = i % CHECK_SHUTDOWN_INTERVAL;
 	switch (modulo) {
 		case 0:
