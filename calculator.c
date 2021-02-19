@@ -34,6 +34,7 @@
 #define ITERATION_LIMIT_INCREASE_FIRST (long)(1.75*ITERATION_LIMIT_INCREASE) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
 #define ITERATION_LIMIT_MAX 30*ITERATION_LIMIT_INCREASE // Maxumum iteration limit before increases shrink drastically
 #define ITERATION_LIMIT_INCREASE_PAST_MAX 1000l // Amount to increase the iteration limit by when finding a new record when past the max
+#define SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE 25 // Chance (out of 100) for the select strategy to skip a seemingly good next move
 #define DEFAULT_CAPACITY_FOR_EMPTY 8
 #define CAPACITY_INCREASE_FACTOR 1.5
 #define CAPACITY_DECREASE_THRESHOLD 0.25
@@ -1179,7 +1180,7 @@ void handleSelectAndRandom(struct BranchPath *curNode, int select, int randomise
 	// Arbitrarily skip over the fastest legal move with a given probability
 	if (select && curNode->moves < 55 && curNode->numLegalMoves > 0) {
 		int nextMoveIndex = 0;
-		while (nextMoveIndex < curNode->numLegalMoves - 1 && rand() % 100 < 50) {
+		while (nextMoveIndex < curNode->numLegalMoves - 1 && rand() % 100 < SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE) {
 			if (checkShutdownOnIndexWithPrefetch(nextMoveIndex)) {
 				break;
 			}
