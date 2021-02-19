@@ -30,9 +30,9 @@
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
 #define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
-#define ITERATION_LIMIT_INCREASE 150000l /*5000000l*/ // Amount to increase the iteration limit by when finding a new PB
+#define ITERATION_LIMIT_INCREASE 5000000l // Amount to increase the iteration limit by when finding a new PB
 #define ITERATION_LIMIT_INCREASE_FIRST (long)(1.75*ITERATION_LIMIT_INCREASE) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
-#define ITERATION_LIMIT_MAX /*30*/2*ITERATION_LIMIT_INCREASE // Maxumum iteration limit before increases shrink drastically
+#define ITERATION_LIMIT_MAX 30*ITERATION_LIMIT_INCREASE // Maxumum iteration limit before increases shrink drastically
 #define ITERATION_LIMIT_INCREASE_PAST_MAX 1000l // Amount to increase the iteration limit by when finding a new record when past the max
 #define DEFAULT_CAPACITY_FOR_EMPTY 8
 #define CAPACITY_INCREASE_FACTOR 1.5
