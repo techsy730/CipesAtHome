@@ -35,10 +35,11 @@
 #define ITERATION_LIMIT_MAX 30*ITERATION_LIMIT_INCREASE // Maxumum iteration limit before increases shrink drastically
 #define ITERATION_LIMIT_INCREASE_PAST_MAX 1000l // Amount to increase the iteration limit by when finding a new record when past the max
 #define SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE 25 // Chance (out of 100) for the select strategy to skip a seemingly good next move
-#define DEFAULT_CAPACITY_FOR_EMPTY 8
-#define CAPACITY_INCREASE_FACTOR 1.5
-#define CAPACITY_DECREASE_THRESHOLD 0.25
-#define CAPACITY_DECREASE_FACTOR 0.35
+#define DEFAULT_CAPACITY_FOR_EMPTY 8 // When initializing a dynamically sized array, an empty/NULL array will be initialized to an Array of this size on a new element add
+#define CAPACITY_INCREASE_FACTOR 1.5 // When a dynamically sized array is full, increase capacity by this factor
+#define CAPACITY_DECREASE_THRESHOLD 0.25 // When a dynamically sized array element count is below this fraction of the capacity, shrink it
+#define CAPACITY_DECREASE_FACTOR 0.35 // When a dynamically sized array is shrunk, shrink it below this factor
+#define CAPACITY_DECREASE_FLOOR 2*DEFAULT_CAPACITY_FOR_EMPTY // Never shrink a dynamically sized array below this capacity
 
 #define NEW_BRANCH_LOG_LEVEL 3
 
@@ -1271,6 +1272,51 @@ struct BranchPath *initializeRoot() {
 	return root;
 }
 
+struct CapacityComputationResult {
+	ssize_t newCapacity;
+	bool needsRealloc;
+	bool needsShrink;
+};
+
+static struct CapacityComputationResult capacityCompute(const ssize_t currentCapacity, const int minNewSize) {
+	ssize_t newCapacity = currentCapacity;
+	bool needsRealloc = false;
+	bool needsShrink = false;
+	ssize_t shrinkThreshold = (ssize_t)(CAPACITY_DECREASE_THRESHOLD * newCapacity);
+	if (currentCapacity == 0) {
+		newCapacity = DEFAULT_CAPACITY_FOR_EMPTY;
+		needsRealloc = true;
+	} else if (minNewSize > currentCapacity) {
+		// Thus + 1 is to assure increase even if the factor rounds to a 0 increase
+		newCapacity = (ssize_t)(CAPACITY_INCREASE_FACTOR * (newCapacity + 1));
+		if (newCapacity < DEFAULT_CAPACITY_FOR_EMPTY) {
+			newCapacity = DEFAULT_CAPACITY_FOR_EMPTY;
+		}
+		needsRealloc = true;
+	} else if (currentCapacity > CAPACITY_DECREASE_FLOOR && minNewSize <= shrinkThreshold) {
+		ssize_t shrunkCapacity = (ssize_t)(CAPACITY_DECREASE_FACTOR * currentCapacity);
+		if (shrunkCapacity < CAPACITY_DECREASE_FLOOR) {
+			shrunkCapacity = CAPACITY_DECREASE_FLOOR;
+		}
+		if (shrunkCapacity < minNewSize) {
+			// Shrunk too much, just fit the array exactly
+			shrunkCapacity = minNewSize;
+		}
+		if (shrunkCapacity < currentCapacity) {
+			needsRealloc = true;
+			needsShrink = true;
+			newCapacity = shrunkCapacity;
+		}
+	}
+	if (needsRealloc) {
+		// Safeguard, make sure we are at least increasing it by a little.
+		_assert_with_stacktrace(newCapacity >= minNewSize);
+		// The above logic should _never_ shrink when we were expecting increase.
+		_assert_with_stacktrace(needsShrink || newCapacity > currentCapacity);
+	}
+	return (struct CapacityComputationResult){newCapacity, needsRealloc, needsShrink};
+}
+
 /*-------------------------------------------------------------------
  * Function 	: insertIntoLegalMoves
  * Inputs	: int			insertIndex
@@ -1283,28 +1329,17 @@ struct BranchPath *initializeRoot() {
  * it takes to complete the legal move.
  -------------------------------------------------------------------*/
 void insertIntoLegalMoves(int insertIndex, struct BranchPath *newLegalMove, struct BranchPath *curNode) {
-	ssize_t newCapacity = curNode->capacityLegalMoves;
-	bool needRealloc = false;
-	int newSize = curNode->numLegalMoves + 1;
-	ssize_t shrinkThreshold = (ssize_t)(CAPACITY_DECREASE_THRESHOLD * newCapacity);
-	if (newCapacity == 0) {
-		newCapacity = DEFAULT_CAPACITY_FOR_EMPTY;
-		needRealloc = true;
-	} else if (newSize > newCapacity) {
-		newCapacity = (ssize_t)(CAPACITY_INCREASE_FACTOR * newCapacity);
-		needRealloc = true;
-	} else if (newSize <= shrinkThreshold) {
-		newCapacity = (ssize_t)(CAPACITY_DECREASE_FACTOR * newCapacity);
-		needRealloc = true;
-	}
-	if (needRealloc) {
+	struct CapacityComputationResult capacityChanges = capacityCompute(
+		curNode->capacityLegalMoves, curNode->numLegalMoves + 1);
+	if (capacityChanges.needsRealloc) { 
+		// Failsafes. Ensure we are at least reaching the target of new size
 		// Reallocate the legalMove array to make room for a new legal move
-		struct BranchPath **temp = realloc(curNode->legalMoves, sizeof(struct BranchPath*) * (newCapacity));
+		struct BranchPath **temp = realloc(curNode->legalMoves, sizeof(struct BranchPath*) * (capacityChanges.newCapacity));
 
 		checkMallocFailed(temp);	
 
 		curNode->legalMoves = temp;
-		curNode->capacityLegalMoves = newCapacity;
+		curNode->capacityLegalMoves = capacityChanges.newCapacity;
 	}
 	
 	// Shift all legal moves further down the array to make room for a new legalMove
