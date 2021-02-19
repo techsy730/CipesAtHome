@@ -44,6 +44,10 @@
 
 #define INDEX_ITEM_UNDEFINED -1
 
+_CIPES_STATIC_ASSERT(CHECK_SHUTDOWN_INTERVAL > 0, "Check for shutdown interval must be > 0");
+_CIPES_STATIC_ASSERT(CHECK_SHUTDOWN_INTERVAL < DEFAULT_ITERATION_LIMIT, "Check for shutdown interval must be < the default iteration limit");
+
+
 // Only GCC can assure that floating point constant expressions can be evaluated at compile time.
 #if defined(__GNUC__) && !defined(__clang__)
 _CIPES_STATIC_ASSERT(CAPACITY_DECREASE_THRESHOLD <= CAPACITY_DECREASE_FACTOR, "The decrease threshold must be <= the decrease factor");
