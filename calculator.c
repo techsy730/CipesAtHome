@@ -31,8 +31,9 @@
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
 #define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
 #define ITERATION_LIMIT_INCREASE 5000000l // Amount to increase the iteration limit by when finding a new PB
-#define ITERATION_LIMIT_INCREASE_FIRST (long)(2.5*ITERATION_LIMIT_INCREASE) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
-#define ITERATION_LIMIT_MAX 30*ITERATION_LIMIT_INCREASE // Maxumum iteration limit before increases shrink drastically
+// Basically 2.5*ITERATION_LIMIT_INCREASE, but keeps floats out of it so we can static_assert on it
+#define ITERATION_LIMIT_INCREASE_FIRST ((ITERATION_LIMIT_INCREASE << 1) + (ITERATION_LIMIT_INCREASE >> 1)) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
+#define ITERATION_LIMIT_MAX 30*ITERATION_LIMIT_INCREASE // Maxumum iteration limit before increases shrink drastically (a soft maximum)
 #define ITERATION_LIMIT_INCREASE_PAST_MAX 1000l // Amount to increase the iteration limit by when finding a new record when past the max
 #define SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE 25 // Chance (out of 100) for the select strategy to skip a seemingly good next move
 #define DEFAULT_CAPACITY_FOR_EMPTY 8 // When initializing a dynamically sized array, an empty/NULL array will be initialized to an Array of this size on a new element add
@@ -40,13 +41,24 @@
 #define CAPACITY_DECREASE_THRESHOLD 0.25 // When a dynamically sized array element count is below this fraction of the capacity, shrink it
 #define CAPACITY_DECREASE_FACTOR 0.35 // When a dynamically sized array is shrunk, shrink it below this factor
 #define CAPACITY_DECREASE_FLOOR 2*DEFAULT_CAPACITY_FOR_EMPTY // Never shrink a dynamically sized array below this capacity
+#define CHECK_SHUTDOWN_INTERVAL 200
 
 #define NEW_BRANCH_LOG_LEVEL 3
 
 #define CHECK_SHUTDOWN_INTERVAL 200
 
-
 #define INDEX_ITEM_UNDEFINED -1
+
+_CIPES_STATIC_ASSERT(VERBOSE_ITERATION_LOG_RATE > 0, "Log rates must be > 0");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE <= ITERATION_LIMIT_MAX, "Default iteration limit must be <= then iteration limit maximum");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_FIRST <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_PAST_MAX <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_PAST_MAX <= ITERATION_LIMIT_INCREASE, "The small Iteration limit (for when past ITERATION_LIMIT_MAX) must be <= the normal iteration limit increase");
+_CIPES_STATIC_ASSERT(SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE < 100, "Chance to skip greedy, seemingly best move must be < 100");
+_CIPES_STATIC_ASSERT(SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE >= 0, "Chance to skip greedy, seemingly best move must be >= 0");
+_CIPES_STATIC_ASSERT(CHECK_SHUTDOWN_INTERVAL > 0, "Check for shutdown interval must be > 0");
+_CIPES_STATIC_ASSERT(CHECK_SHUTDOWN_INTERVAL < DEFAULT_ITERATION_LIMIT, "Check for shutdown interval must be < the default iteration limit");
 
 // Only GCC can assure that floating point constant expressions can be evaluated at compile time.
 #if defined(__GNUC__) && !defined(__clang__)
