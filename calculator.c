@@ -31,7 +31,7 @@
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
 #define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
 #define ITERATION_LIMIT_INCREASE 5000000l // Amount to increase the iteration limit by when finding a new PB
-#define ITERATION_LIMIT_INCREASE_FIRST (long)(1.75*ITERATION_LIMIT_INCREASE) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
+#define ITERATION_LIMIT_INCREASE_FIRST (long)(2.5*ITERATION_LIMIT_INCREASE) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
 #define ITERATION_LIMIT_MAX 30*ITERATION_LIMIT_INCREASE // Maxumum iteration limit before increases shrink drastically
 #define ITERATION_LIMIT_INCREASE_PAST_MAX 1000l // Amount to increase the iteration limit by when finding a new record when past the max
 #define SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE 25 // Chance (out of 100) for the select strategy to skip a seemingly good next move
