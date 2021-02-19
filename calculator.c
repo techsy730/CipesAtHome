@@ -36,7 +36,8 @@
 #define ITERATION_LIMIT_INCREASE_PAST_MAX 1000l // Amount to increase the iteration limit by when finding a new record when past the max
 #define DEFAULT_CAPACITY_FOR_EMPTY 8
 #define CAPACITY_INCREASE_FACTOR 1.5
-#define CAPACITY_DECREASE_THRESHOLD 0.4
+#define CAPACITY_DECREASE_THRESHOLD 0.25
+#define CAPACITY_DECREASE_FACTOR 0.35
 
 #define NEW_BRANCH_LOG_LEVEL 3
 
@@ -1292,7 +1293,8 @@ void insertIntoLegalMoves(int insertIndex, struct BranchPath *newLegalMove, stru
 		newCapacity = (ssize_t)(CAPACITY_INCREASE_FACTOR * newCapacity);
 		needRealloc = true;
 	} else if (newSize <= shrinkThreshold) {
-		newCapacity = shrinkThreshold;
+		newCapacity = (ssize_t)(CAPACITY_DECREASE_FACTOR * newCapacity);
+		needRealloc = true;
 	}
 	if (needRealloc) {
 		// Reallocate the legalMove array to make room for a new legal move
@@ -2254,7 +2256,7 @@ static void logIterations(int ID, int stepIndex, struct BranchPath * curNode, lo
 	if (will_log_level(level)) {
 		char callString[30];
 		char iterationString[200];
-		sprintf(callString, "Call %d", ID);
+		sprintf(callString, "Thread %d", ID);
 		sprintf(iterationString, "%d steps currently taken, %d frames accumulated so far; %ldk iterations (%ldk current iteration max)",
 			stepIndex, curNode->description.totalFramesTaken, iterationCount / 1000, iterationLimit / 1000);
 		recipeLog(level, "Calculator", "Info", callString, iterationString);
@@ -2266,7 +2268,7 @@ static void logIterationsAfterPB(int ID, int stepIndex, struct BranchPath * curN
 	if (will_log_level(level)) {
 		char callString[30];
 		char iterationString[300];
-		sprintf(callString, "Call %d", ID);
+		sprintf(callString, "Thread %d", ID);
 		sprintf(iterationString, "%d steps currently taken, %d (%d after optimizing) frames accumulated so far; %ldk iterations (%ldk previous iteration max, %ldk new iteration max)",
 			stepIndex, curNode->description.totalFramesTaken, afterOptimizingFrames, iterationCount / 1000, oldIterationLimit / 1000, iterationLimit / 1000);
 		recipeLog(level, "Calculator", "Info", callString, iterationString);
@@ -2284,7 +2286,8 @@ static void logIterationsAfterPB(int ID, int stepIndex, struct BranchPath * curN
  * a roadmap is found, the data is printed to a .txt file, and the result
  * is passed back to start.c to try submitting to the server.
  -------------------------------------------------------------------*/
-struct Result calculateOrder(int ID, long max_branches) {
+struct Result calculateOrder(const int rawID, long max_branches) {
+	const int displayID = rawID + 1;
 	int randomise = getConfigInt("randomise");
 	int select = getConfigInt("select");
 	int debug = getConfigInt("debug");
@@ -2319,7 +2322,7 @@ struct Result calculateOrder(int ID, long max_branches) {
 		if (total_dives % branchInterval == 0 && will_log_level(NEW_BRANCH_LOG_LEVEL)) {
 			char temp1[30];
 			char temp2[50];
-			sprintf(temp1, "Call %d", ID);
+			sprintf(temp1, "Thread %d", displayID);
 			sprintf(temp2, "Searching New Branch %zu", total_dives);
 			recipeLog(NEW_BRANCH_LOG_LEVEL, "Calculator", "Info", temp1, temp2);
 		}
@@ -2358,14 +2361,14 @@ struct Result calculateOrder(int ID, long max_branches) {
 							printResults(filename, optimizeResult.root);
 							if (will_log_level(1)) {
 								char tmp[200];
-								sprintf(tmp, "Call %d][New local fastest roadmap found! %d frames, saved %d after rearranging", ID, optimizeResult.last->description.totalFramesTaken, curNode->description.totalFramesTaken - optimizeResult.last->description.totalFramesTaken);
+								sprintf(tmp, "Thread %d][New local fastest roadmap found! %d frames, saved %d after rearranging", displayID, optimizeResult.last->description.totalFramesTaken, curNode->description.totalFramesTaken - optimizeResult.last->description.totalFramesTaken);
 								recipeLog(1, "Calculator", "Info", "Roadmap", tmp);
 							}
 							free(filename);
 							if (debug) {
 								testRecord(result_cache.frames);
 							}
-							result_cache = (struct Result){ optimizeResult.last->description.totalFramesTaken, ID };
+							result_cache = (struct Result){ optimizeResult.last->description.totalFramesTaken, rawID };
 							
 							const long oldIterationLimit = iterationLimit;
 							// Reset the iteration count so we continue to explore near this record
@@ -2381,7 +2384,7 @@ struct Result calculateOrder(int ID, long max_branches) {
 							} else {
 								iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE_PAST_MAX, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX/50);
 							}
-							logIterationsAfterPB(ID, stepIndex, curNode, optimizeResult.last->description.totalFramesTaken, iterationCount, oldIterationLimit, iterationLimit, 3);
+							logIterationsAfterPB(displayID, stepIndex, curNode, optimizeResult.last->description.totalFramesTaken, iterationCount, oldIterationLimit, iterationLimit, 3);
 						}
 					}
 					
@@ -2529,10 +2532,10 @@ struct Result calculateOrder(int ID, long max_branches) {
 				iterationCount++;
 				if (iterationCount % (branchInterval * DEFAULT_ITERATION_LIMIT) == 0
 					&& (freeRunning || iterationLimit != DEFAULT_ITERATION_LIMIT)) {
-					logIterations(ID, stepIndex, curNode, iterationCount, iterationLimit, 3);
+					logIterations(displayID, stepIndex, curNode, iterationCount, iterationLimit, 3);
 				}
 				else if (iterationCount % VERBOSE_ITERATION_LOG_RATE == 0) {
-					logIterations(ID, stepIndex, curNode, iterationCount, iterationLimit, 6);
+					logIterations(displayID, stepIndex, curNode, iterationCount, iterationLimit, 6);
 				}
 			}
 		}

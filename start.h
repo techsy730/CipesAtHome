@@ -8,7 +8,8 @@
 
 struct Result {
 	int frames;
-	int callNumber;
+	// 0 is first thread, -1 makes this an invalid result
+	int rawThreadNumber;
 };
 
 // May get a value <0 if local record was corrupt.
