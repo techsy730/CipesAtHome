@@ -662,12 +662,12 @@
 // clang's `-Wdeprecated-declarations` option. This option is turned off by
 // default, but the warnings will be reported by clang-tidy.
 #if ( \
-  defined(__clang__) \ && ( \
+  defined(__clang__) && ( \
     ABSL_HAVE_ATTRIBUTE(deprecated) \
     || (__clang_major__ > 3 || (__clang_major__ == 3 && __clang_minor__ >= 3) \
     || (defined(__cplusplus) && __cplusplus >= 201103L)) \
   ) || ( \
-  defined(__GNUC__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)))
+  defined(__GNUC__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1))))
 #define ABSL_DEPRECATED(message) __attribute__((deprecated(message)))
 #elif defined(_MSC_VER) && _MSC_VER >= 1900
 #define ABSL_DEPRECATED(message) __declspec(deprecated((message)))
