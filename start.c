@@ -248,19 +248,20 @@ int main(int argc, char **argv) {
 	#pragma omp parallel
 	{
 		long cycle_count = 0;
-		int ID = omp_get_thread_num();
+		int rawID = omp_get_thread_num();
+		int displayID = rawID + 1;
 		
-		printf("[Thread %d][Started]\n", ID);
+		printf("[Thread %d/%d][Started]\n", displayID, workerCount);
 		
 		// Seed each thread's PRNG for the select and randomise config options
-		srand(((int)time(NULL)) ^ ID);
+		srand(((int)time(NULL)) ^ rawID);
 		
 		while (max_outer_loops_fixed < 0 || cycle_count < max_outer_loops_fixed) {
 			if (askedToShutdown()) {
 				break;
 			}
 			++cycle_count;
-			struct Result result = calculateOrder(ID, max_branches_fixed);
+			struct Result result = calculateOrder(rawID, max_branches_fixed);
 			
 			// result might store -1 frames for errors that might be recoverable
 			if (result.frames > -1) {
@@ -268,7 +269,7 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		printf("[Thread %d][Done]\n", ID);
+		printf("[Thread %d/%d][Done]\n", displayID, workerCount);
 	}
 	
 	return 0;

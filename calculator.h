@@ -187,6 +187,6 @@ struct BranchPath* initializeRoot();
 // Other
 void periodicGithubCheck();
 // void logIterations(int ID, int stepIndex, struct BranchPath * curNode, long iterationCount, long iterationLimit, int level);
-struct Result calculateOrder(int ID, long max_branches);
+struct Result calculateOrder(int rawID, long max_branches);
 
 #endif
