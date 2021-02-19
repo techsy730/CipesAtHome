@@ -7,11 +7,13 @@
 # We do a LOT of heavy post processing of these flags, and will cause things to break horrifically if not able to.
 
 WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -Werror=incompatible-pointer-types
+CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
 
-CFLAGS:=-lcurl -lconfig -fopenmp $(WARNINGS_AND_ERRORS) -I . -O2 $(CFLAGS)
+CFLAGS:=-lcurl -lconfig -fopenmp -I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic -DINCLUDE_STACK_TRACES=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
-HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
+HIGH_OPT_CFLAGS?=-O3
+GCC_ONLY_HIGH_OPT_CFLAGS?=-fprefetch-loop-arrays
 TARGET=recipesAtHome
 HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o
@@ -129,6 +131,15 @@ else
 	COMPILER=unknown
 endif
 
+ifeq (clang,$(COMPILER))
+	WARNINGS_AND_ERRORS:=$(CLANG_ONLY_WARNINGS) $(WARNINGS_AND_ERRORS)
+endif
+CFLAGS:=$(WARNINGS_AND_ERRORS) $(CFLAGS) 
+
+ifeq (gcc,$(COMPILER))
+	HIGH_OPT_CFLAGS+=$(GCC_ONLY_HIGH_OPT_CFLAGS)
+endif
+
 ifeq (1,$(USE_GOOGLE_PERFTOOLS))
 	ifeq (1,$(PERFORMANCE_PROFILING))
 		DEBUG?=1
@@ -179,8 +190,8 @@ else
 endif
 
 ifeq (1,$(USE_LTO))
-	DEBUG_CFLAGS+=-ffat-lto-objects
 	ifeq (gcc,$(COMPILER))
+		DEBUG_CFLAGS+=-ffat-lto-objects
 		CFLAGS+=-flto=jobserver -fuse-ld=gold
 	else
 		CFLAGS+=-flto
