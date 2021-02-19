@@ -6,7 +6,9 @@
 # Putting them after the make call (as arguments to make) causes make to IGNORE any changes we try to do.
 # We do a LOT of heavy post processing of these flags, and will cause things to break horrifically if not able to.
 
-CFLAGS:=-lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -I . -O2 $(CFLAGS)
+WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -Werror=incompatible-pointer-types
+
+CFLAGS:=-lcurl -lconfig -fopenmp $(WARNINGS_AND_ERRORS) -I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic -DINCLUDE_STACK_TRACES=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3 -fprefetch-loop-arrays
@@ -130,11 +132,11 @@ endif
 ifeq (1,$(USE_GOOGLE_PERFTOOLS))
 	ifeq (1,$(PERFORMANCE_PROFILING))
 		DEBUG?=1
-		CFLAGS:=-ltcmalloc_and_profiler $(CFLAGS)
+		CFLAGS:= $(CFLAGS) -ltcmalloc_and_profiler
 	else ifeq (1,$(DEBUG))
-		CFLAGS:=-ltcmalloc $(CFLAGS)
+		CFLAGS:=$(CFLAGS) -ltcmalloc
 	else
-		CFLAGS:=-ltcmalloc_minimal $(CFLAGS)
+		CFLAGS:=$(CFLAGS) -ltcmalloc_minimal
 	endif
 else
 	ifeq (1,$(PERFORMANCE_PROFILING))
