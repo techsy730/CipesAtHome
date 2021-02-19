@@ -25,12 +25,15 @@
 #define TYPE_SORT_FRAMES 39			// Penalty to perform type ascending sort
 #define REVERSE_TYPE_SORT_FRAMES 41		// Penalty to perform type descending sort
 #define JUMP_STORAGE_NO_TOSS_FRAMES 5		// Penalty for not tossing the last item (because we need to get Jump Storage)
+#define INVENTORY_SIZE 20
 
 // User configurable tunables
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
 #define DEFAULT_ITERATION_LIMIT 100000l // Cutoff for iterations explored before resetting
 #define ITERATION_LIMIT_INCREASE 100000000l // Amount to increase the iteration limit by when finding a new record
-#define INVENTORY_SIZE 20
+#define DEFAULT_CAPACITY_FOR_EMPTY 8
+#define CAPACITY_INCREASE_FACTOR 1.5
+#define CAPACITY_DECREASE_THRESHOLD 0.4
 
 #define NEW_BRANCH_LOG_LEVEL 3
 
@@ -46,6 +49,8 @@
 //#else
 #define NOISY_DEBUG(...) do {} while(0)
 //#endif
+
+const int INT_OUTPUT_ARRAY_SIZE_BYTES = sizeof(int) * NUM_RECIPES;
 
 typedef enum Alpha_Sort Alpha_Sort;
 typedef enum Type_Sort Type_Sort;
@@ -157,13 +162,25 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE extern inline void copyCook(struct Cook *cookNew, s
  * Outputs	: 
  * A simple memcpy to duplicate oldOutputsFulfilled to a new array
  -------------------------------------------------------------------*/
-ABSL_MUST_USE_RESULT_INCLUSIVE int *copyOutputsFulfilled(int *oldOutputsFulfilled) {
-	int *newOutputsFulfilled = malloc(sizeof(int) * NUM_RECIPES);
+ABSL_MUST_USE_RESULT_INCLUSIVE static int *copyOutputsFulfilled(int *oldOutputsFulfilled) {
+	int *newOutputsFulfilled = malloc(INT_OUTPUT_ARRAY_SIZE_BYTES);
 
 	checkMallocFailed(newOutputsFulfilled);
 
-	memcpy((void *)newOutputsFulfilled, (void *)oldOutputsFulfilled, sizeof(int) * NUM_RECIPES);
+	memcpy((void *)newOutputsFulfilled, (void *)oldOutputsFulfilled, INT_OUTPUT_ARRAY_SIZE_BYTES);
 	return newOutputsFulfilled;
+}
+
+/*-------------------------------------------------------------------
+ * Function 	: copyOutputsFulfilledNoAlloc
+ * Inputs	: int *destOutputsFulfilled, int *srcOutputsFulfilled
+ * Outputs	: 
+ * A simple memcpy to duplicate srcOutputsFulfilled into destOutputsFulfilled
+ * Basically copyOutputsFulfilled, but no allocation (both arrays must already be allocated).
+ * NOTE: Destination is FIRST; this is to conform with the order set by copyCook.
+ -------------------------------------------------------------------*/
+ABSL_ATTRIBUTE_ALWAYS_INLINE static inline void copyOutputsFulfilledNoAlloc(int *destOutputsFulfilled, const int *srcOutputsFulfilled) {
+	memcpy((void *)destOutputsFulfilled, (void *)srcOutputsFulfilled, INT_OUTPUT_ARRAY_SIZE_BYTES);
 }
 
 /*-------------------------------------------------------------------
@@ -407,6 +424,7 @@ struct BranchPath *createLegalMove(struct BranchPath *node, struct Inventory inv
 	newLegalMove->numOutputsCreated = numOutputsFulfilled;
 	newLegalMove->legalMoves = NULL;
 	newLegalMove->numLegalMoves = 0;
+	newLegalMove->capacityLegalMoves = 0;
 	if (description.action >= Sort_Alpha_Asc && description.action <= Sort_Type_Des) {
 		newLegalMove->totalSorts = node->totalSorts + 1;
 	}
@@ -584,7 +602,8 @@ void freeNode(struct BranchPath *node) {
 void fulfillChapter5(struct BranchPath *curNode) {
 	// Create an outputs chart but with the Dried Bouquet collected
 	// to ensure that the produced inventory can fulfill all remaining recipes
-	int *tempOutputsFulfilled = copyOutputsFulfilled(curNode->outputCreated);
+	int tempOutputsFulfilled[NUM_RECIPES];
+	copyOutputsFulfilledNoAlloc(tempOutputsFulfilled, curNode->outputCreated);
 	tempOutputsFulfilled[getIndexOfRecipe(Dried_Bouquet)] = 1;
 	int numOutputsFulfilled = curNode->numOutputsCreated + 1;
 	
@@ -616,7 +635,7 @@ void fulfillChapter5(struct BranchPath *curNode) {
 			handleDBCOAllocation2Nulls(curNode, newInventory, tempOutputsFulfilled, numOutputsFulfilled, eval);
 	}
 
-	free(tempOutputsFulfilled);
+	// We know tempOutputsFulfilled does not escape this scope, so safe to be unallocated on return.
 }
 
 /*-------------------------------------------------------------------
@@ -660,7 +679,8 @@ void fulfillRecipes(struct BranchPath *curNode) {
 			struct Inventory newInventory = curNode->inventory;
 			
 			// Mark that this output has been fulfilled for viability determination
-			int *tempOutputsFulfilled = copyOutputsFulfilled(curNode->outputCreated);
+			int tempOutputsFulfilled[NUM_RECIPES];
+			copyOutputsFulfilledNoAlloc(tempOutputsFulfilled, curNode->outputCreated);
 			tempOutputsFulfilled[recipeIndex] = 1;
 			int numOutputsFulfilled = curNode->numOutputsCreated + 1;
 			
@@ -678,7 +698,7 @@ void fulfillRecipes(struct BranchPath *curNode) {
 			handleRecipeOutput(curNode, newInventory, tempFrames, useDescription, tempOutputsFulfilled, numOutputsFulfilled, recipe.output, viableItems);
 			
 			free(cookBase);
-			free(tempOutputsFulfilled);
+			// We know tempOutputsFulfilled does not escape this scope, so safe to be unallocated on return.
 		}
 	}
 }
@@ -1241,6 +1261,7 @@ struct BranchPath *initializeRoot() {
 	root->numOutputsCreated = 0;
 	root->legalMoves = NULL;
 	root->numLegalMoves = 0;
+	root->capacityLegalMoves = 0;
 	root->totalSorts = 0;
 	return root;
 }
@@ -1257,12 +1278,28 @@ struct BranchPath *initializeRoot() {
  * it takes to complete the legal move.
  -------------------------------------------------------------------*/
 void insertIntoLegalMoves(int insertIndex, struct BranchPath *newLegalMove, struct BranchPath *curNode) {
-	// Reallocate the legalMove array to make room for a new legal move
-	struct BranchPath **temp = realloc(curNode->legalMoves, sizeof(struct BranchPath*) * (curNode->numLegalMoves + 1));
+	ssize_t newCapacity = curNode->capacityLegalMoves;
+	bool needRealloc = false;
+	int newSize = curNode->numLegalMoves + 1;
+	ssize_t shrinkThreshold = (ssize_t)(CAPACITY_DECREASE_THRESHOLD * newCapacity);
+	if (newCapacity == 0) {
+		newCapacity = DEFAULT_CAPACITY_FOR_EMPTY;
+		needRealloc = true;
+	} else if (newSize > newCapacity) {
+		newCapacity = (ssize_t)(CAPACITY_INCREASE_FACTOR * newCapacity);
+		needRealloc = true;
+	} else if (newSize <= shrinkThreshold) {
+		newCapacity = shrinkThreshold;
+	}
+	if (needRealloc) {
+		// Reallocate the legalMove array to make room for a new legal move
+		struct BranchPath **temp = realloc(curNode->legalMoves, sizeof(struct BranchPath*) * (newCapacity));
 
-	checkMallocFailed(temp);
+		checkMallocFailed(temp);	
 
-	curNode->legalMoves = temp;
+		curNode->legalMoves = temp;
+		curNode->capacityLegalMoves = newCapacity;
+	}
 	
 	// Shift all legal moves further down the array to make room for a new legalMove
 	shiftDownLegalMoves(curNode, insertIndex, curNode->numLegalMoves);
@@ -1340,6 +1377,7 @@ struct BranchPath *copyAllNodes(struct BranchPath *newNode, struct BranchPath *o
 		newNode->numOutputsCreated = oldNode->numOutputsCreated;
 		newNode->legalMoves = NULL;
 		newNode->numLegalMoves = 0;
+		newNode->capacityLegalMoves = 0;
 		if (newNode->numOutputsCreated < NUM_RECIPES) {
 			newNode->next = malloc(sizeof(struct BranchPath));
 
@@ -1852,6 +1890,7 @@ void reallocateRecipes(struct BranchPath* newRoot, enum Type_Sort* rearranged_re
 		insertNode->numOutputsCreated = record_placement_node->numOutputsCreated + 1;
 		insertNode->legalMoves = NULL;
 		insertNode->numLegalMoves = 0;
+		insertNode->capacityLegalMoves = 0;
 		
 		// Update all subsequent nodes with
 		for (struct BranchPath *node = insertNode->next; node!= NULL; node = node->next) {

@@ -81,6 +81,7 @@ struct BranchPath {
 	int numOutputsCreated;				// Number of valid outputCreated entries to eliminate a lengthy for-loop
 	struct BranchPath **legalMoves;		// Represents possible next paths to take
 	int numLegalMoves;
+	ssize_t capacityLegalMoves;
 	int totalSorts;
 };
 
@@ -177,7 +178,8 @@ int selectSecondItemFirst(int* ingredientLoc, size_t nulls, int viableItems);
 void swapItems(int* ingredientLoc);
 
 // General node functions
-int *copyOutputsFulfilled(int *oldOutputsFulfilled);
+// No longer public API
+// ABSL_MUST_USE_RESULT_INCLUSIVE int *copyOutputsFulfilled(int *oldOutputsFulfilled);
 void freeAllNodes(struct BranchPath* node);
 void freeNode(struct BranchPath *node);
 struct BranchPath* initializeRoot();
