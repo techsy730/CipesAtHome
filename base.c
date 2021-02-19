@@ -1,5 +1,9 @@
 #include "base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Provides external definition (function body in header)
 extern inline void checkMallocFailed(const void* const p);
 bool _abrt_from_assert = false;
@@ -42,3 +46,6 @@ ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f) {
 ABSL_FORCE_ALWAYS_INLINE extern inline void printStackTraceF(FILE* f);
 #endif
 
+#ifdef __cplusplus
+} // extern "C"
+#endif

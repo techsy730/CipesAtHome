@@ -16,10 +16,32 @@
 #endif
 #endif
 
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ < 201112L
+#error recipesAtHome requires at least C11 mode to build
+#endif
+
+#ifndef _STR
+#define _STR(x) #x
+#endif
+#ifndef _XSTR
+#define _XSTR(x) _STR(x)
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#define COMPILER_WARNING(x) _Pragma(_STR(GCC warning x))
+#else
+#define COMPILER_WARNING(x) _Pragma(_STR(message (x)))
+#endif
+
+
 #ifdef INCLUDE_STACK_TRACES
 ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f);
 #else
 ABSL_ATTRIBUTE_ALWAYS_INLINE inline printStackTraceF(FILE* f) {}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
  /*-------------------------------------------------------------------
@@ -42,6 +64,25 @@ inline void checkMallocFailed(const void* const p) {
 	}
 }
 
+// __cplusplus == 201103L means C++11
+#ifdef __cplusplus
+#if __cplusplus >= 201103L
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK static_assert(true, "Never should see this error")
+#else
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK struct ABSL_ATTRIBUTE_UNUSED __DoNotUse
+#endif
+#elif (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L)
+// __STDC_VERSION__ == 201112L means C11
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _Static_assert(true, "Never should see this error")
+#else
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK ABSL_ATTRIBUTE_UNUSED static int __doNotUse
+#endif
+
+// Will NOT work in top level, use _REQUIRE_SEMICOLON_TOP_LEVEL_OK for that
+#define _REQUIRE_SEMICOLON do {} while(0)
+
+
+
 extern bool _abrt_from_assert /*= false*/;
 
 #define STACK_TRACE_FRAMES 15
@@ -61,9 +102,18 @@ extern bool _abrt_from_assert /*= false*/;
 #define SUPPORTS_AUTOTYPE 1
 #endif
 
+// __cplusplus == 201103L means C++11
+// __STDC_VERSION__ == 201112L means C11
+#if (defined(__cplusplus) && __cplusplus >= 201103L) \
+	|| (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L)
+#define _CIPES_STATIC_ASSERT(condition, message) static_assert(condition, message ": " #condition " (" _XSTR(condition) ") is NOT true")
+#else
+COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
+#define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_OK
+#endif
+
 #ifdef NDEBUG
-// To force the semicolon
-#define _assert_with_stacktrace(condition) do {} while(0)
+#define _assert_with_stacktrace(condition) _REQUIRE_SEMICOLON
 #elif defined(INCLUDE_STACK_TRACES)
 #if __cplusplus >= 201103L // C++11 or greater
 #define _assert_with_stacktrace(condition) ({ \
@@ -71,6 +121,7 @@ extern bool _abrt_from_assert /*= false*/;
   if (!_condition) { \
   	_abrt_from_assert = true; \
   	printStackTraceF(stderr); \
+  	fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
   	assert((condition)); \
 	} \
 })
@@ -80,6 +131,7 @@ extern bool _abrt_from_assert /*= false*/;
   if (!_condition) { \
   	_abrt_from_assert = true; \
   	printStackTraceF(stderr); \
+		fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
   	assert((condition)); \
   } \
 })
@@ -89,6 +141,7 @@ extern bool _abrt_from_assert /*= false*/;
   if (!_condition) { \
   	_abrt_from_assert = true; \
   	printStackTraceF(stderr); \
+		fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
   	assert((condition)); \
 	} \
 })
@@ -97,6 +150,7 @@ extern bool _abrt_from_assert /*= false*/;
   if (! ABSL_PREDICT_TRUE((condition))) { \
   	_abrt_from_assert = true; \
   	printStackTraceF(stderr); \
+		fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
   	assert((condition)); \
 	} \
 })
@@ -173,7 +227,11 @@ extern bool _abrt_from_assert /*= false*/;
 #define _PREFETCH_READ_NO_TEMPORAL_LOCALITY(addr) _mm_prefetch((addr), PREFETCHNTA)
 #else
 // Handy hack to still require a semicolon
-#define _PREFETCH_READ_NO_TEMPORAL_LOCALITY(addr) do { } while (0)
+#define _PREFETCH_READ_NO_TEMPORAL_LOCALITY(addr) _REQUIRE_SEMICOLON
 #endif
 
+#endif
+
+#ifdef __cplusplus
+} // extern "C"
 #endif
