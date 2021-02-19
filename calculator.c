@@ -2597,7 +2597,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 		}
 
 		// Period check for Github update (only perform on thread 0)
-		if (total_dives % 10000 == 0 && omp_get_thread_num() == 0) {
+		if (total_dives % 10000 == 0 && rawID == 0) {
 			periodicGithubCheck();
 		}
 		
