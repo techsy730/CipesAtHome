@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
 	int max_outer_loops = -1;
 	long max_branches = -1;
 	if (argc >= 2) {
-		max_branches = atoi(argv[1]);
+		max_branches = atol(argv[1]);
 		if (argc >= 3) {
 			max_outer_loops = atoi(argv[2]);
 		}
@@ -217,13 +217,13 @@ int main(int argc, char **argv) {
 				printf("PB.txt is corrupted (PB record less then 0 frames). Ignoring.\n");
 			} else {
 				current_frame_record = PB_record;
+				if (current_frame_record < UNSET_FRAME_RECORD) {
+					printf("Your current PB is %d frames.\n", current_frame_record);
+				}
 				testRecord(current_frame_record);
 			}
 		}
 		fclose(fp);
-		if (current_frame_record < UNSET_FRAME_RECORD) {
-			printf("Your current PB is %d frames.\n", current_frame_record);
-		}
 		printf("Happy cooking!\n");
 
 		// Submit the user's fastest roadmap to the server for leaderboard purposes
