@@ -29,7 +29,9 @@
 // User configurable tunables
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
-#define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
+#define DEFAULT_ITERATION_LIMIT 125000l // Cutoff for iterations explored before resetting
+#define DEFAULT_ITERATION_LIMIT_SHORT 50000l // Cutoff for iterations explored before resetting when short branches is randomly selected
+#define SHORT_ITERATION_LIMIT_CHANCE 40 // Chance (out of 100) for a thread to choose DEFAULT_ITERATION_LIMIT_SHORT instead of DEFAULT_ITERATION_LIMIT when starting a new branch
 #define ITERATION_LIMIT_INCREASE 5000000l // Amount to increase the iteration limit by when finding a new PB
 // Basically 2.5*ITERATION_LIMIT_INCREASE, but keeps floats out of it so we can static_assert on it
 #define ITERATION_LIMIT_INCREASE_FIRST ((ITERATION_LIMIT_INCREASE << 1) + (ITERATION_LIMIT_INCREASE >> 1)) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
@@ -50,8 +52,11 @@
 #define INDEX_ITEM_UNDEFINED -1
 
 _CIPES_STATIC_ASSERT(VERBOSE_ITERATION_LOG_RATE > 0, "Log rates must be > 0");
+_CIPES_STATIC_ASSERT(DEFAULT_ITERATION_LIMIT_SHORT <= DEFAULT_ITERATION_LIMIT, "Short iteration limit must be <= then default iteration limit");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE <= ITERATION_LIMIT_MAX, "Default iteration limit must be <= then iteration limit maximum");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
+_CIPES_STATIC_ASSERT(SHORT_ITERATION_LIMIT_CHANCE < 100, "Chance to use short iteration limit must be < 100");
+_CIPES_STATIC_ASSERT(SHORT_ITERATION_LIMIT_CHANCE >= 0, "Chance to use short iteration limit must be >= 0");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_FIRST <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_PAST_MAX <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_PAST_MAX <= ITERATION_LIMIT_INCREASE, "The small Iteration limit (for when past ITERATION_LIMIT_MAX) must be <= the normal iteration limit increase");
@@ -1207,7 +1212,7 @@ void handleSelectAndRandom(struct BranchPath *curNode, int select, int randomise
 	// Arbitrarily skip over the fastest legal move with a given probability
 	if (select && curNode->moves < 55 && curNode->numLegalMoves > 0) {
 		int nextMoveIndex = 0;
-		while (nextMoveIndex < curNode->numLegalMoves - 1 && rand() % 100 < SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE) {
+		while (nextMoveIndex < curNode->numLegalMoves - 1 && (rand() % 100) < SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE) {
 			if (checkShutdownOnIndexWithPrefetch(nextMoveIndex)) {
 				break;
 			}
@@ -2367,13 +2372,14 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 		if (askedToShutdown()) {
 			break;
 		}
-		int stepIndex = 0;
-		long iterationCount = 0;
-		long iterationLimit = DEFAULT_ITERATION_LIMIT;
-
 		if (max_branches > 0 && total_dives >= max_branches) {
 			break;
 		}
+
+		int stepIndex = 0;
+		long iterationCount = 0;
+		bool useShortIterationLimit = (rand() % 100) < SHORT_ITERATION_LIMIT_CHANCE;
+		long iterationLimit = useShortIterationLimit ? DEFAULT_ITERATION_LIMIT_SHORT : DEFAULT_ITERATION_LIMIT;
 
 		// Create root of tree path
 		curNode = initializeRoot();
