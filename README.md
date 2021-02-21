@@ -49,6 +49,11 @@ You can see all the important ones in the `Makefile`
 * `FAST_CFLAGS_BUT_NO_VERIFICATION=1`: Turn off a bunch of runtime validation assertions, so there is much
   less protection against undefined behavior if anything goes wrong with the code, and very little output about
   what went wrong if it does.
+* `USE_GOOGLE_PERFTOOLS=1`: Use [Gperfutils](https://github.com/gperftools/gperftools) (formerly "Google Performance Tools")
+  and their `malloc` implementation that tends to work much better in multi-core contexts due to thread local heap pools.<br>
+  Currently Gperfutils is only available for Linux.<br>
+  On Ubuntu at least, you can install this using `apt install google-perftools libgoogle-perftools-dev`<br>
+  Note in this package, `pprof` is instead names `google-pprof`. Otherwise it acts the same.
 * `PROFILE_GENERATE=1`: Generate the instrumentation profile. See [Profile Guided Optimization](#profile_guided_optimizaton)
 
   **Note**: You may want to run `make prof_clean` to clean our the profiling data from previous runs before
@@ -57,6 +62,9 @@ You can see all the important ones in the `Makefile`
 
   **Warning**: You _must_ `make clean` before doing this or else `make` won't recognize anything really
   changed and thus not rebuild using the profile.
+
+There are also options to enable profiling profiling (as in for memory tracking and CPU time tracking) options, see the `Makefile`
+for more details.
 
 <a name=profile_guided_optimizaton></a>
 
