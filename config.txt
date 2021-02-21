@@ -80,7 +80,18 @@
 ###############################################
 
 ###############################################
-  Version = "1.13"                              
+#                   Version                   #
+###############################################
+# The -TechSY730 is what is called a prerelease
+# specifier it doesn't actually affect the    #
+# version check, or change what server you    #
+# connect to.                                 #
+# It distinguishes my fork from a             #
+# hypothetical future 1.14 from mainline.     #
+# Feel free to remove it if you don't feel    #
+# comfortable advertising this is my fork,    #
+# feel free to remove it.                     #
+  Version = "1.14-TechSY730"                              
 ###############################################
 
 ###############################################
