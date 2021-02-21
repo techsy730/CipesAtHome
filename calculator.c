@@ -84,15 +84,18 @@ static inline bool checkShutdownOnIndex(int i) {
 
 ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
 static inline bool prefetchShutdownOnIndex(int i) {
+#if ENABLE_PREFETCHING
 	if (i % CHECK_SHUTDOWN_INTERVAL == (CHECK_SHUTDOWN_INTERVAL - 1)) {
 		prefetchShutdown();
 		return true;
 	}
+#endif
 	return false;
 }
 
 ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
 static inline bool checkShutdownOnIndexWithPrefetch(int i) {
+#if ENABLE_PREFETCHING
 	int modulo = i % CHECK_SHUTDOWN_INTERVAL;
 	switch (modulo) {
 		case 0:
@@ -103,6 +106,9 @@ static inline bool checkShutdownOnIndexWithPrefetch(int i) {
 		default:
 			return false;
 	}
+#else
+	return checkShutdownOnIndex(i);
+#endif
 }
 
 ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
@@ -112,15 +118,19 @@ static inline bool checkShutdownOnIndexLong(long i) {
 
 ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
 static inline bool prefetchShutdownOnIndexLong(long i) {
+#if ENABLE_PREFETCHING
 	if (i % CHECK_SHUTDOWN_INTERVAL == (CHECK_SHUTDOWN_INTERVAL - 1)) {
 		prefetchShutdown();
 		return true;
 	}
+#endif
 	return false;
+
 }
 
 ABSL_ATTRIBUTE_UNUSED ABSL_ATTRIBUTE_ALWAYS_INLINE
 static inline bool checkShutdownOnIndexLongWithPrefetch(long i) {
+#if ENABLE_PREFETCHING
 	int modulo = i % CHECK_SHUTDOWN_INTERVAL;
 	switch (modulo) {
 		case 0:
@@ -131,6 +141,9 @@ static inline bool checkShutdownOnIndexLongWithPrefetch(long i) {
 		default:
 			return false;
 	}
+#else
+	return checkShutdownOnIndexLong(i);
+#endif
 }
 
 /*-------------------------------------------------------------------
