@@ -2463,7 +2463,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 							const long oldIterationLimit = iterationLimit;
 							// Reset the iteration count so we continue to explore near this record
 							if (iterationLimit < ITERATION_LIMIT_MAX) {
-								if (iterationLimit == DEFAULT_ITERATION_LIMIT) {
+								if (iterationLimit == DEFAULT_ITERATION_LIMIT || iterationLimit == DEFAULT_ITERATION_LIMIT_SHORT) {
 									iterationLimit = iterationCount + ITERATION_LIMIT_INCREASE_FIRST;
 								} else {
 									iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX);
