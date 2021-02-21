@@ -3,7 +3,8 @@
 ## TechSY730's modifications
 
 **WARNING**: I have _not_ tested this in Visual Studio on Windows, as I don't have Visual Studio or Windows.
-File an issue if you are concerned about this.
+
+If you find any issues with my fork, you can file them on https://github.com/techsy730/CipesAtHome
 
 * A bunch of memory leaks fixed
 * Compile the "inner loop" C (currently `caliculator.c`, `recipes.c`, and `inventory.c`) files with `-O3`.
