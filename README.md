@@ -1,4 +1,98 @@
-# CipesAtHome
+# CipesAtHome-TechSY730
+
+## TechSY730's modifications
+
+**WARNING**: I have _not_ tested this in Visual Studio on Windows, as I don't have Visual Studio or Windows.
+File an issue if you are concerned about this.
+
+* A bunch of memory leaks fixed
+* Compile the "inner loop" C (currently `caliculator.c`, `recipes.c`, and `inventory.c`) files with `-O3`.
+* A bunch of optimizations, especially reducing malloc churn
+* Cleaner shutdown, give the threads a chance to finish their work before shutting down (you can force it by giving the exit command (`ctrl-C` usually) multiple times.
+* Better (IMO) logging
+* More Makefile configuration options
+
+### Branches
+
+There are three branches to choose from.
+
+* MakefileImprovements: Only the tamer `Makefile` adjustments and basic code changes to support clean shutdowns.
+* Optimizations: The `MakefileImprovements` branch and also a bunch optimizations and fixes to memory leaks (also more even more fancy Makefile options)
+* ConstantsAdjustments: The `MakefileImprovements` branch as well as a bunch of tuning constant additions and
+  changes to (hopefully) have `recipesAtHome` spend less time on probably dead-end branches.
+  You can change these yourself if you wish by editing the `#define`s in calculator.c.
+  
+`master` is currently tracking `ConstantsAdjustments`.
+
+### New Makefile configuration variables
+
+Make sure to append these _before_ the `make` call (using env or something). Passing these into `make`'s parameters causes `make`
+to override these.
+
+**Note**: This obviously only works when using `make`. if you are building through Visual Studio, you won't get any of this.
+
+This doesn't list all of them, but some of the ones normal users might be interested in.
+You can see all the important ones in the `Makefile`
+
+* `CC=...`: Override the compiler used to this one. So you can now use `clang` on Linux, or a newer compiler then your OS's
+  default selection, among other uses.
+* `CFLAGS=...`: You can use this to add your own CLFAGS on top of what CipesAtHome needs to build.
+  One common use is to set `-march=native` or similar to build a binary taking advantage of all the features
+  your processor has, at the expense of portabability (so don't send the build executable to anyone else).
+* `USE_LTO=1`: Turn on link time optimizations, which should allow the compiler far more whole program optimization potential
+  This can be a bit fiddly on some compilers and linker combinations though.
+* `DEBUG=1`: Include debug symbols in the binary, for easier debugging if something goes wrong.
+  This will not slow down execution by any meaningful degree, but will increase binary size.<br>
+  There is also `DEBUG_EXTRA=1` for even more output on failures, but can lose performance indirectly
+  by making some code ineligible for certain optimizations.
+* `FAST_CFLAGS_BUT_NO_VERIFICATION=1`: Turn off a bunch of runtime validation assertions, so there is much
+  less protection against undefined behavior if anything goes wrong with the code, and very little output about
+  what went wrong if it does.
+* `PROFILE_GENERATE=1`: Generate the instrumentation profile. See [Profile Guided Optimization](#profile_guided_optimizaton)
+
+  **Note**: You may want to run `make prof_clean` to clean our the profiling data from previous runs before
+  running the generated binary.
+* `PROFILE_USE=1`: Use the generated profile data to optimize even further. See [Profile Guided Optimization](#profile_guided_optimizaton)
+
+  **Warning**: You _must_ `make clean` before doing this or else `make` won't recognize anything really
+  changed and thus not rebuild using the profile.
+
+<a name=profile_guided_optimizaton></a>
+
+### Profile Guided Optimization
+
+Profile Guided Optimization (PGO) is the act of using data about a run's counts of functions and branch paths in order to have
+a better understand what parts of the program are "hot" or "cold" ("used a lot" or "not used much"), and then having the
+compiler make an optimized binary that use this knowledge for better optimization.
+
+#### Generating the instrumentation profile `PROFILE_GENERATE=1`
+
+For CipesAtHome, you can accomplish this by building with `PROFILE_GENERATE=1`, which will generate an intstrumented binary.
+This binary will dump instrumentation data (the "hot" vs "cold" data mentioned above) to files in a subfolder called `prof/`
+(the exact files in the folder will depend on your compiler).
+
+Before running the built `recipesAtHome`, I suggest running `make prof_clean` to clean out any previous profiling data
+(some compilers will refuse to overwrite it if there are old files there).
+
+Furthermore, I suggest starting from a fresh `results` folder, so some "PB finding" code gets covered as well.
+So move your `results` folder to `results.BAK` or something.
+
+Now run `recipesAtHome`. It *will* run **much** slower then an optimized build; this is normal, it has to dump profiling data while running.
+This should be multithread safe for `gcc` and `clang`
+I would let it run for about 30 minutes or so.
+
+After this, _make sure_ to `make clean` or `make` won't know to rebuild these files.
+**Do not** run `make prof_clean`, as that will remove the profiling data you just gathered.
+
+#### Using the profiled data `PROFILE_USE=1`
+
+Then rebuild using `PROFILE_USE=1` (and unset `PROFILE_GENERATE` or set it to `0`), and the profiling data should be
+picked up and you will get an even more optimized binary.
+
+Make sure to copy (I highly suggest copy, not move, to keep a backup) `results.BAK` to `results`.
+Now run your
+
+# CipesAtHome (Original README.md starts here)
 
 ## Overview
 Welcome to CipesAtHome! This is a depth-first-search brute-forcer which implements different RNG-based methodologies to iterate down unique paths in the recipe tree in an attempt to discover the fastest known order of recipes. Upon discovery of the fastest known recipe roadmap, a generated roadmap file is submitted to a Blob server that we maintain. Upon reaching the first Zess T section in the Paper Mario: TTYD 100% TAS, the search will be over and the TAS will implement the currently known fastest recipe roadmap. Below are a set of rules and assumptions regarding a glitch we will be making use of called Inventory Overload. Given these rules and assumptions, we have constructed an algorithm which mimics how the game handles the inventory while under the effect of this glitch, as well as determine whether or not certain moves can be performed, which may include: cooking a particular recipe, using a particular item combination to cook a particular recipe, and tossing a particular item in the inventory to make room for the output.
