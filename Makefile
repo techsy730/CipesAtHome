@@ -11,15 +11,15 @@ CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-opti
 
 CFLAGS:=-lcurl -lconfig -fopenmp -I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
-DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1
+DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DDEBUG=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3
 GCC_ONLY_HIGH_OPT_CFLAGS?=-fprefetch-loop-arrays
 EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
 FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG
 TARGET=recipesAtHome
-HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
-OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o
+HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h semver.h $(wildcard absl/base/*.h)
+OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
 # Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/

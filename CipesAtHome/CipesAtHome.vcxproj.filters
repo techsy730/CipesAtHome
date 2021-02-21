@@ -45,6 +45,9 @@
 	<ClCompile Include="..\base.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+	<ClCompile Include="..\semver.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\inventory.h">
@@ -75,6 +78,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\semver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\absl\attributes.h">
