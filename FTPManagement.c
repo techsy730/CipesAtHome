@@ -10,6 +10,7 @@
 #include "config.h"
 #include "logger.h"
 #include "base.h"
+#include "semver.h"
 
 struct memory {
 	char *data;
@@ -217,13 +218,37 @@ int checkForUpdates(const char *local_ver) {
 		return -1;
 	}
 	
-	// Compare local version with github version
-	if (strncmp(local_ver, ver, 4) != 0) {
-		cJSON_Delete(json);
-		return 1;
+	semver_t local_ver_struct;
+	semver_t remote_ver_struct;
+
+	bool local_had_error = semver_parse(local_ver, &local_ver_struct);
+	bool remote_had_error = semver_parse(ver, &remote_ver_struct);
+
+	int result = -1;
+
+	if (local_had_error) {
+	  printf("Unable to parse local version: '%s'\n", local_ver);
 	}
-	
+	if (remote_had_error) {
+	  printf("Unable to parse remote version: '%s'\n", ver);
+	}
+	if (local_had_error || remote_had_error) {
+	  printf("Unable to parse one of the versions as a semver string. Falling back to exact version comparison.\n");
+    // Compare local version with github version
+    if (strncmp(local_ver, ver, 4) != 0) {
+      result = 1;
+    } else {
+      result = 0;
+    }
+	} else if (semver_lt(local_ver_struct, remote_ver_struct)) {
+	  result = 1;
+	} else {
+	  result = 0;
+	}
+
 	// Add logs
 	cJSON_Delete(json);
-	return 0;
+  semver_free(&local_ver_struct);
+  semver_free(&remote_ver_struct);
+	return result;
 }

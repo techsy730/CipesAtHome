@@ -153,6 +153,7 @@
     <ClCompile Include="..\logger.c" />
     <ClCompile Include="..\recipes.c" />
     <ClCompile Include="..\start.c" />
+    <ClCompile Include="..\semver.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\base.h" />
@@ -165,6 +166,7 @@
     <ClInclude Include="..\logger.h" />
     <ClInclude Include="..\recipes.h" />
     <ClInclude Include="..\start.h" />
+    <ClInclude Include="..\semver.h" />
     <ClInclude Include="..\absl\attributes.h" />
     <ClInclude Include="..\absl\config.h" />
     <ClInclude Include="..\absl\optimization.h" />
