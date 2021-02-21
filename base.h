@@ -34,15 +34,28 @@
 #endif
 
 
-#ifdef INCLUDE_STACK_TRACES
-ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f);
-#else
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline printStackTraceF(FILE* f) {}
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#ifdef INCLUDE_STACK_TRACES
+ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f);
+#else
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline void printStackTraceF(FILE* f) {}
+#endif
+
+#if !NO_PRINT_ON_MALLOC_FAIL
+ABSL_ATTRIBUTE_ALWAYS_INLINE
+#endif
+ABSL_ATTRIBUTE_COLD
+inline void handleMallocFailure() {
+#if !NO_PRINT_ON_MALLOC_FAIL
+    fprintf(stderr, "Fatal error! Ran out of heap memory.\n");
+    fprintf(stderr, "Press enter to quit.\n");
+    printStackTraceF(stderr);
+    ABSL_ATTRIBUTE_UNUSED char exitChar = getchar();
+#endif
+}
 
  /*-------------------------------------------------------------------
  * Function 	: checkMallocFailed
@@ -54,24 +67,23 @@ extern "C" {
  * If it was NULL, then this function will print an error message and
  * exit the program with a failure status.
  -------------------------------------------------------------------*/
-inline void checkMallocFailed(const void* const p) {
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline void checkMallocFailed(const void* const p) {
+#if !NO_MALLOC_CHECK
 	if (ABSL_PREDICT_FALSE(p == NULL)) {
-		fprintf(stderr, "Fatal error! Ran out of heap memory.\n");
-		fprintf(stderr, "Press enter to quit.\n");
-		printStackTraceF(stderr);
-		ABSL_ATTRIBUTE_UNUSED char exitChar = getchar();
+	  handleMallocFailure();
 		exit(1);
 	}
+#endif
 }
 
 // __cplusplus == 201103L means C++11
 #ifdef __cplusplus
-#if __cplusplus >= 201103L
+#if __cplusplus >= 201103L && !defined(__CDT_PARSER__)
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_OK static_assert(true, "Never should see this error")
 #else
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_OK struct ABSL_ATTRIBUTE_UNUSED __DoNotUse
 #endif
-#elif (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L)
+#elif (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L) && !defined(__CDT_PARSER__)
 // __STDC_VERSION__ == 201112L means C11
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _Static_assert(true, "Never should see this error")
 #else
@@ -80,8 +92,6 @@ inline void checkMallocFailed(const void* const p) {
 
 // Will NOT work in top level, use _REQUIRE_SEMICOLON_TOP_LEVEL_OK for that
 #define _REQUIRE_SEMICOLON do {} while(0)
-
-
 
 extern bool _abrt_from_assert /*= false*/;
 
@@ -98,13 +108,19 @@ extern bool _abrt_from_assert /*= false*/;
 #define SUPPORTS_TYPEOF 1
 #endif
 
-#if ABSL_HAVE_BUILTIN(__autotype) || (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)))
+// Eclipse does not understand the __autotype syntax.
+// The __CDT_PARSER__ macro is only active for Eclipse's parsing for symbols, not it's compilation.
+#if !defined(__CDT_PARSER__) && (ABSL_HAVE_BUILTIN(__autotype) || (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9))))
 #define SUPPORTS_AUTOTYPE 1
 #endif
 
+// Eclipse does not like static_assert in C code even though it is part of the standard now.
+// The __CDT_PARSER__ macro is only active for Eclipse's parsing for symbols, not it's compilation.
+#ifdef __CDT_PARSER__
+#define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_OK
 // __cplusplus == 201103L means C++11
 // __STDC_VERSION__ == 201112L means C11
-#if (defined(__cplusplus) && __cplusplus >= 201103L) \
+#elif (defined(__cplusplus) && __cplusplus >= 201103L) \
 	|| (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L)
 #define _CIPES_STATIC_ASSERT(condition, message) static_assert(condition, message ": " #condition " (" _XSTR(condition) ") is NOT true")
 #else
@@ -112,8 +128,13 @@ COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
 #define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_OK
 #endif
 
+_CIPES_STATIC_ASSERT(true == 1, "true from stdbool.h must be 1 for the math to work correctly");
+
+
 #ifdef NDEBUG
 #define _assert_with_stacktrace(condition) _REQUIRE_SEMICOLON
+#elif NO_STACK_TRACE_ASSERT
+#define _assert_with_stacktrace(condition) assert((condition))
 #elif defined(INCLUDE_STACK_TRACES)
 #if __cplusplus >= 201103L // C++11 or greater
 #define _assert_with_stacktrace(condition) ({ \
@@ -125,7 +146,7 @@ COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
   	assert((condition)); \
 	} \
 })
-#elif SUPPORTS_AUTOTYPE
+#elif SUPPORTS_AUTOTYPE && !defined(__CDT_PARSER__)
 #define _assert_with_stacktrace(condition) ({ \
   __auto_type _condition = ABSL_PREDICT_TRUE((condition)); \
   if (!_condition) { \
@@ -165,7 +186,7 @@ COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
 	auto _x = (x); \
 	auto _y = (y); \
 	_x > _y ?	_x : _y;})
-#elif SUPPORTS_AUTOTYPE
+#elif SUPPORTS_AUTOTYPE && !defined(__CDT_PARSER__)
 #define MAX(x,y) ({ \
 	__auto_type _x = (x); \
 	__auto_type _y = (y); \
@@ -185,7 +206,7 @@ COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
 	auto _x = (x); \
 	auto _y = (y); \
 	_x < _y ?	_x : _y;})
-#elif SUPPORTS_AUTOTYPE
+#elif SUPPORTS_AUTOTYPE && !defined(__CDT_PARSER__)
 #define MIN(x,y) ({ \
 	__auto_type _x = (x); \
 	__auto_type _y = (y); \
@@ -216,9 +237,11 @@ COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
 #define VA_OPT_SUPPORTED 0
 #endif
 
+#if !ENABLE_PREFETCHING
+#define _PREFETCH_READ_NO_TEMPORAL_LOCALITY(addr) _REQUIRE_SEMICOLON
 // Annoyingly, abseil doesn't have a ABSL_PREFETCH or similar.
 // So try to do it ourselves
-#if ABSL_HAVE_BUILTIN(__builtin_prefetch) || (defined(__GNUC__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 2)))
+#elif ABSL_HAVE_BUILTIN(__builtin_prefetch) || (defined(__GNUC__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 2)))
 // GCC or Clang
 #define _PREFETCH_READ_NO_TEMPORAL_LOCALITY(addr) __builtin_prefetch((addr), 0, 0)
 #elif ((defined(__x86_64__) && __x86_64__ == 1) || (defined(_M_X64)) && (defined(_MSC_VER) || defined(__INTEL_COMPILER))
@@ -226,7 +249,6 @@ COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
 #include <xmmintrin.h>
 #define _PREFETCH_READ_NO_TEMPORAL_LOCALITY(addr) _mm_prefetch((addr), PREFETCHNTA)
 #else
-// Handy hack to still require a semicolon
 #define _PREFETCH_READ_NO_TEMPORAL_LOCALITY(addr) _REQUIRE_SEMICOLON
 #endif
 

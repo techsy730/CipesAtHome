@@ -5,7 +5,8 @@ extern "C" {
 #endif
 
 // Provides external definition (function body in header)
-extern inline void checkMallocFailed(const void* const p);
+ABSL_ATTRIBUTE_UNUSED inline void handleMallocFailure();
+ABSL_ATTRIBUTE_UNUSED inline void checkMallocFailed(const void* const p);
 bool _abrt_from_assert = false;
 
 #ifdef INCLUDE_STACK_TRACES
@@ -43,7 +44,7 @@ ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f) {
 	return;
 }
 #else
-ABSL_FORCE_ALWAYS_INLINE extern inline void printStackTraceF(FILE* f);
+ABSL_ATTRIBUTE_ALWAYS_INLINE ABSL_ATTRIBUTE_UNUSED inline void printStackTraceF(FILE* f);
 #endif
 
 #ifdef __cplusplus

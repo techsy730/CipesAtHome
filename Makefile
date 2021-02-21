@@ -6,14 +6,17 @@
 # Putting them after the make call (as arguments to make) causes make to IGNORE any changes we try to do.
 # We do a LOT of heavy post processing of these flags, and will cause things to break horrifically if not able to.
 
-WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds -Werror=incompatible-pointer-types
+WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds
 CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
 
 CFLAGS:=-lcurl -lconfig -fopenmp -I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic -DINCLUDE_STACK_TRACES=1
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
+DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3
 GCC_ONLY_HIGH_OPT_CFLAGS?=-fprefetch-loop-arrays
+EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
+FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG
 TARGET=recipesAtHome
 HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h $(wildcard absl/base/*.h)
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o
@@ -24,11 +27,15 @@ DEPDIR?=.deps
 # gcc, clang, and icc all recognize this syntax
 GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 
-# Recognized configurable variables:
-# DEBUG=1 Include debug symbols in the build and include stack traces (minimal to no impact on performance, just makes the binary bigger)
+# Recognized configurable variables: (any of the ones listed as "=1" don't actually default to 1, that is what you set it to enable the feature)
+# DEBUG=1 : Include debug symbols in the build and include stack traces (minimal to no impact on performance, just makes the binary bigger)
 # CFLAGS=... : Any additional CFLAGS to be used (are specified after built in CFLAGS)
 # HIGH_OPT_CLFLAGS=... : Any additional CFLAGS to pass to known CPU bottleneck source files
 #   This overrides the default of "-O3" instead of appends to it
+# EXPERIMENTAL_OPTIMIZATIONS=1 :  Include some experimental optimizations that may or may not actually improve performance;
+#  may cause some code to be uneligable for certain optimizations that might offset any benefits that code would get. 
+# FAST_CFLAGS_BUT_NO_VERIFICATION=1 : Disable some forms of verifiation that should allow it to optimize even better,
+#   but you lose most protection against undefined behavior if something goes wrong.
 # USE_LTO=1 : Whether to enable link time optimizations (-flto)
 #   Note that link time optimizations can be rather fiddly to get to work
 # PROFILE_GENERATE=1 : Whether to enable profile generation for profile assited optimization
@@ -39,6 +46,7 @@ GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 #   Generate a binary ready to be profiled using gprov or similar
 #   Unlike PROFILE_GENERATE which generatees profiles for profile assisted optimization, this option makes a binary ready for use for performance profiling.
 #   You may want to consider setting DEBUG_VERIFY_PROFILING=1 as well if you want to have even more things like heap validation.
+# DEBUG_EXTRA=1 : Include even more diagnostic messages but may lose out on some small optimization opportunities
 # DEBUG_VERIFY_PROFILING=1 Extra debugging flags to enable for things like verifying heap integrity and performance profiling (WILL reduce performance)
 # USE_GOOGLE_PERFTOOLS=1
 #   Use Google's perftools (and malloc implementation).
@@ -79,6 +87,12 @@ DEBUG_EXPLICIT=0
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_LTO)))
 	USE_LTO=1
 endif
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(EXPERIMENTAL_OPTIMIZATIONS)))
+	EXPERIMENTAL_OPTIMIZATIONS=1
+endif
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(FAST_CFLAGS_BUT_NO_VERIFICATION)))
+	FAST_CFLAGS_BUT_NO_VERIFICATION=1
+endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(PROFILE_GENERATE)))
 	PROFILE_GENERATE=1
 endif
@@ -89,6 +103,11 @@ ifneq (,$(filter $(RECOGNIZED_TRUE), $(PERFORMANCE_PROFILING)))
 	PERFORMANCE_PROFILING=1
 endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG)))
+	DEBUG=1
+	DEBUG_EXPLICIT=1
+endif
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG_EXTRA)))
+	DEBUG_EXTRA=1
 	DEBUG=1
 	DEBUG_EXPLICIT=1
 endif
@@ -138,6 +157,12 @@ CFLAGS:=$(WARNINGS_AND_ERRORS) $(CFLAGS)
 
 ifeq (gcc,$(COMPILER))
 	HIGH_OPT_CFLAGS+=$(GCC_ONLY_HIGH_OPT_CFLAGS)
+endif
+ifeq (1,$(FAST_CFLAGS_BUT_NO_VERIFICATION))
+	CFLAGS+=$(FAST_CFLAGS_BUT_NO_VERIFY)
+endif
+ifeq (1,$(EXPERIMENTAL_OPTIMIZATIONS))
+	CFLAGS+=$(EXPERIMENTAL_OPT_CFLAGS)
 endif
 
 ifeq (1,$(USE_GOOGLE_PERFTOOLS))
@@ -241,11 +266,16 @@ ifeq (1,$(DEBUG))
 		endif
 		DEBUG_CFLAGS+=$(DEBUG_VERIFY_PROFILING_CFLAGS)
 	endif
+	ifeq (1,$(DEBUG_EXTRA))
+		DEBUG_CFLAGS+=$(DEBUG_EXTRA_CFLAGS)
+	endif
 	CFLAGS+=$(DEBUG_CFLAGS)
 	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
 endif
 
 default: $(TARGET)
+
+all: default
 
 .PHONY: clean clean_prof prof_clean make_dep_dir make_prof_dir prof_finish
 
