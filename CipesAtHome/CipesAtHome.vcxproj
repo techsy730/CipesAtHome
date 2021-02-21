@@ -143,6 +143,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\base.c" />
     <ClCompile Include="..\calculator.c" />
     <ClCompile Include="..\cJSON.c" />
     <ClCompile Include="..\config.c" />
@@ -154,6 +155,7 @@
     <ClCompile Include="..\start.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\base.h" />
     <ClInclude Include="..\calculator.h" />
     <ClInclude Include="..\cJSON.h" />
     <ClInclude Include="..\config.h" />
@@ -163,6 +165,12 @@
     <ClInclude Include="..\logger.h" />
     <ClInclude Include="..\recipes.h" />
     <ClInclude Include="..\start.h" />
+    <ClInclude Include="..\absl\attributes.h" />
+    <ClInclude Include="..\absl\config.h" />
+    <ClInclude Include="..\absl\optimization.h" />
+    <ClInclude Include="..\absl\options.h" />
+    <ClInclude Include="..\absl\policy_checks.h" />
+    <ClInclude Include="..\absl\port.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\config.txt">
