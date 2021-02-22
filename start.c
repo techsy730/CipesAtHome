@@ -19,11 +19,16 @@
 #include <signal.h>
 #include <omp.h>
 #include "absl/base/port.h"
-#if !_CIPES_IS_WINDOWS
+#if !_CIPES_IS_WINDOWS || defined(__MINGW32__)
+#if _POSIX_C_SOURCE >= 200112L
 #include <sys/select.h>
+#endif
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#endif
+#if _CIPES_IS_WINDOWS
+#include <direct.h>
 #endif
 
 #define WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS 10
@@ -107,6 +112,7 @@ BOOL WINAPI windowsCtrlCHandler(DWORD fdwCtrlType) {
     default:
     	return FALSE;
   }
+}
 #endif
 
 void setSignalHandlers() {
@@ -158,7 +164,7 @@ int main(int argc, char **argv) {
 		printf("Could not check version on Github. Please check your internet connection.\n");
 		printf("Otherwise, we can't submit completed roadmaps to the server!\n");
 		printf("Alternatively you may have been rate-limited. Please wait a while and try again.\n");
-#if _CIPES_IS_WINDOWS
+#if _CIPES_IS_WINDOWS || _POSIX_C_SOURCE < 200112L
 		printf("Will continue after %d seconds\n", WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS);
 		Sleep(WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS * 1000);
 #else
@@ -203,7 +209,11 @@ int main(int argc, char **argv) {
 
 	// Verify that the results folder exists
 	// If not, create the directory
+#if _CIPES_IS_WINDOWS
+	_mkdir("./results");
+#else
 	mkdir("./results", 0777);
+#endif
 
 	// To avoid generating roadmaps that are slower than the user's record best,
 	// use PB.txt to identify the user's current best

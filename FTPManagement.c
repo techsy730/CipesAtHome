@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <curl/curl.h>
-#include <sys/stat.h>
+#include <sys/stat.h> // Apparently in Windows too ¯\_(ツ)_/¯
 #include "cJSON.h"
 #include "FTPManagement.h"
 #include <libconfig.h>

@@ -20,11 +20,21 @@
 #error recipesAtHome requires at least C11 mode to build
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef _STR
 #define _STR(x) #x
 #endif
 #ifndef _XSTR
 #define _XSTR(x) _STR(x)
+#endif
+
+#if defined(_MSC_FULL_VER) || defined(_MSC_VER) || defined(__MINGW32__)
+#define _CIPES_IS_WINDOWS 1
+#else
+#define _CIPES_IS_WINDOWS 0
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -33,12 +43,20 @@
 #define COMPILER_WARNING(x) _Pragma(_STR(message (x)))
 #endif
 
-
-#ifdef __cplusplus
-extern "C" {
+// For some ridiculous reason, even though it has been part of C11 for like a decade now,
+// some versions of Visual Studio do not support the "%z" printf specifier (for printing size_t's)
+// So gotta work around it if that happens.
+// _MSV_VER == 1800 is Visual Studio 2013
+#if _CIPES_IS_WINDOWS && (!defined(_MSC_VER) || _MSV_VER < 1800)
+#define _zf "%I64d"
+#define _zuf "%I64u"
+#else
+#define _zf "%z"
+#define _zuf "%zu"
 #endif
 
 #ifdef INCLUDE_STACK_TRACES
+#define STACK_TRACE_FRAMES 15
 ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f);
 #else
 ABSL_ATTRIBUTE_ALWAYS_INLINE inline void printStackTraceF(FILE* f) {}
@@ -95,13 +113,6 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE inline void checkMallocFailed(const void* const p) 
 
 extern bool _abrt_from_assert /*= false*/;
 
-#define STACK_TRACE_FRAMES 15
-
-#if defined(_MSC_FULL_VER) || defined(_MSC_VER)
-#define _CIPES_IS_WINDOWS 1
-#else
-#define _CIPES_IS_WINDOWS 0
-#endif
 
 // _MSC_VER 1910 is Visual Studio 2017
 #if defined(__GNUC__) || defined(__clang__) || (defined(_MSC_VER) && _MSC_VER >= 1910)

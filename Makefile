@@ -6,15 +6,20 @@
 # Putting them after the make call (as arguments to make) causes make to IGNORE any changes we try to do.
 # We do a LOT of heavy post processing of these flags, and will cause things to break horrifically if not able to.
 
-WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers -Werror=format-overflow -Werror=format-truncation -Werror=maybe-uninitialized -Werror=array-bounds
+WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds
 CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
 
-CFLAGS:=-lcurl -lconfig -fopenmp -I . -O2 $(CFLAGS)
+EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
+CFLAGS:=-I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
 DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DDEBUG=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3
-GCC_ONLY_HIGH_OPT_CFLAGS?=-fprefetch-loop-arrays
+GCC_ONLY_HIGH_OPT_CFLAGS?=
+# Trying to match x86-64-v3
+# as specified in https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
+# An intersection of -march=haswell and -march=bdver4 (as of gcc-9) is the most concise way to express this (until gcc-11 and clang-12)
+AVX2_BUILD_CFLAGS?=-march=haswell -mno-hle -mtune=generic
 EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
 FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG
 TARGET=recipesAtHome
@@ -120,6 +125,13 @@ endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_DEPENDENCY_FILES)))
 	USE_DEPENDENCY_FILES=1
 endif
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(FOR_DISTRIBUTION)))
+	FOR_DISTRIBUTION=1
+endif
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(ASSUME_X86_64_V3)))
+	# See https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
+	ASSUME_X86_64_V3=1
+endif
 
 
 ifeq ($(PROFILE_GENERATE) $(PROFILE_USE), 1 1)
@@ -138,7 +150,30 @@ ifneq ($(IS_CC_EXACTLY_CC) $(IS_CC_EMPTY), 0 0)
 	endif
 endif
 
-ifneq (,$(findstring gcc, $(CC)))
+_64_BIT_MINGW=x86_64-w64-mingw
+_32_BIT_MINGW=i686-w64-mingw
+_HAS_M64_CFLAG=$(findstring -m64,$(CFLAGS))
+_HAS_M32_CFLAG=$(findstring -m32,$(CFLAGS))
+
+IS_WINDOWS=0
+IS_WINDOWS_32=0
+IS_WINDOWS_64=0
+
+ifneq (,$(and $(findstring $(_32_BIT_MINGW),$(CC)),$(_HAS_M64_CFLAG)))
+$(error Can't use "-m64" on a 32-bit MinGW compiler. Use the right compiler for bitness (should start with $(_64_BIT_MINGW)))
+else ifneq (,$(and $(findstring $(_64_BIT_MINGW),$(CC)),$(_HAS_M32_CFLAG)))
+$(error Can't use "-m32" on a 64-bit MinGW compiler. Use the right compiler for bitness (should start with $(_32_BIT_MINGW)))
+endif
+
+ifneq (,$(findstring $(_64_BIT_MINGW),$(CC)))
+	COMPILER=gcc
+	IS_WINDOWS=1
+	IS_WINDOWS_64=1
+else ifneq (,$(findstring $(_32_BIT_MINGW),$(CC))) 
+	COMPILER=gcc
+	IS_WINDOWS=1
+	IS_WINDOWS_32=1
+else ifneq (,$(findstring gcc, $(CC)))
 	COMPILER=gcc
 else ifneq (,$(findstring g++, $(CC)))
 	COMPILER=gcc
@@ -153,7 +188,44 @@ endif
 ifeq (clang,$(COMPILER))
 	WARNINGS_AND_ERRORS:=$(CLANG_ONLY_WARNINGS) $(WARNINGS_AND_ERRORS)
 endif
-CFLAGS:=$(WARNINGS_AND_ERRORS) $(CFLAGS) 
+CFLAGS:=$(WARNINGS_AND_ERRORS) $(CFLAGS)
+
+ifeq (1,$(FOR_DISTRIBUTION))
+ifeq (1,$(IS_WINDOWS))
+	_OPEN_MP_DLL_LOCATION=$(shell $(CC) --print-file-name=libgomp-1.dll)
+	# FINAL_STATIC_LINKS+=
+	# FINAL_TARGET_CFLAGS+=
+	EXTERNAL_LIBS+=-Iinclude_manually_provided -Llib_manually_provided/win
+endif
+ifeq (1,$(IS_WINDOWS_64))
+	ifeq (1 true,$(ASSUME_X86_64_V3) \
+	$(shell if [ -d lib_manually_provided/win64-avx2 -a -f lib_manually_provided/win64-avx2/libcurl.dll ]; then echo "true"; fi))
+		EXTERNAL_LIBS+=-Llib_manually_provided/win64-avx2
+	else
+		EXTERNAL_LIBS+=-Llib_manually_provided/win64
+	endif
+endif
+ifeq (1,$(IS_WINDOWS_32))
+	EXTERNAL_LIBS+=-Llib_manually_provided/win32
+	# Format strings for size_t don't line up, and not really an easy way to fix it.
+	# Demote mismatching args to a warning
+	CFLAGS+=--warn-format
+endif
+endif
+
+ifeq (1,$(IS_WINDOWS_32))
+	# Format strings for size_t don't line up, and not really an easy way to fix it.
+	# Demote mismatching args to a warning
+	CFLAGS:=$(filter-out -Werror=format,$(CFLAGS))
+endif
+
+CFLAGS:=$(EXTERNAL_LIBS) $(CFLAGS)
+
+ifeq (1,$(FOR_DISTRIBUTION))
+ifeq (1,$(ASSUME_X86_64_V3))
+	CFLAGS:=$(AVX2_BUILD_CFLAGS) $(CFLAGS)
+endif
+endif
 
 ifeq (gcc,$(COMPILER))
 	HIGH_OPT_CFLAGS+=$(GCC_ONLY_HIGH_OPT_CFLAGS)
@@ -217,7 +289,7 @@ endif
 ifeq (1,$(USE_LTO))
 	ifeq (gcc,$(COMPILER))
 		DEBUG_CFLAGS+=-ffat-lto-objects
-		CFLAGS+=-flto=jobserver -fuse-ld=gold
+		CFLAGS+=-fuse-ld=gold -flto=jobserver
 	else
 		CFLAGS+=-flto
 	endif
@@ -310,7 +382,7 @@ $(HIGH_PERF_OBJS): %.o: %.c $(DEPS) | prof_finish make_dep_dir
 	$(CC) $(DEP_FLAGS) $(CFLAGS) -c -o $@ $<
 
 $(TARGET): $(OBJ) | make_prof_dir prof_finish
-	$(CC) $(CFLAGS) $(HIGH_OPT_CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(HIGH_OPT_CFLAGS) $(FINAL_TARGET_CFLAGS) -o $@ $^ $(FINAL_STATIC_LINKS)
 
 ifeq (,$(DEPDIR))
 _DEPDIR_LOCATION=.
@@ -325,7 +397,7 @@ $(DEPFILES):
 
 clean:
 	$(RM) ./*.o
-	$(RM) ./$(TARGET)
+	$(RM) ./$(TARGET) ./$(TARGET).exe
 	$(RM) ./*.d
 	$(RM) ./$(DEPDIR)/*.d
 

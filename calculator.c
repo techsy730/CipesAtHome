@@ -1641,11 +1641,11 @@ void printCh5Sort(const struct CH5 *ch5Data, FILE *fp) {
 void printCookData(const struct BranchPath *curNode, const MoveDescription desc, FILE *fp) {
 	struct Cook *cookData = desc.data;
 	size_t nulls = curNode->prev->inventory.nulls;
-	fprintf(fp, "Use [%s] in slot %zu ", getItemName(cookData->item1),
+	fprintf(fp, "Use [%s] in slot " _zuf " ", getItemName(cookData->item1),
 		cookData->itemIndex1 - (cookData->itemIndex1 < 10 ? nulls : 0) + 1);
 
 	if (cookData->numItems == 2) {
-		fprintf(fp, "and [%s] in slot %zu ", getItemName(cookData->item2),
+		fprintf(fp, "and [%s] in slot " _zuf " ", getItemName(cookData->item2),
 			cookData->itemIndex2 - (cookData->itemIndex2 < 10 ? nulls : 0) + 1);
 	}
 
@@ -2394,7 +2394,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 			char temp1[30];
 			char temp2[50];
 			sprintf(temp1, "Thread %d", displayID);
-			sprintf(temp2, "Searching New Branch %zu", total_dives);
+			sprintf(temp2, "Searching New Branch %ld", total_dives);
 			recipeLog(NEW_BRANCH_LOG_LEVEL, "Calculator", "Info", temp1, temp2);
 		}
 
