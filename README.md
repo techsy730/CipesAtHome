@@ -101,6 +101,90 @@ picked up and you will get an even more optimized binary.
 Make sure to copy (I highly suggest copy, not move, to keep a backup) `results.BAK` to `results`.
 Now run your
 
+### Building/Releasing
+
+#### Releasing for Windows using MinGW-w64
+
+Since I personally do not have Visual Studio or Windows, I have to compile for Windows using MinGW-w64 (note the w64 part, it is a fork of the original MinGW).
+
+If you DO have Visual Studio, then I strongly encourage you to follow the [original Windows instructions](#windows-building-original)
+
+My workflow is very specific to my setup. You will probably need to change compiler names.
+
+I still follow [original Windows instructions](#windows-building-original).
+
+However, _before_ building I set
+
+```
+export CFLAGS="-O2 -flto=jobserver -fuse-ld=gold -ftree-vectorize"
+export CXXFLAGS="$CFLAGS"
+# Customize these based on what your distribution names them as
+CC_64=x86_64-w64-mingw32-gcc
+CXX_64=x86_64-w64-mingw32-g++
+CC_32=i686-w64-mingw32-gcc
+CXX_32=i686-w64-mingw32-g++
+```
+
+Then build using
+
+```
+# 64-bit build
+export CC=$CC_64
+export CXX=$_64
+vcpkg --triplet x64-mingw-dynamic install curl
+vcpkg --triplet x64-mingw-dynamic install libconfig --head 
+# 32-bit build (--no-downloads to prevent the case of another version being downloaded and having inconsistent versions)
+export CC=CC_32
+export CXX=CC_32
+vcpkg --triplet x86-mingw-dynamic install --no-downloads curl
+vcpkg --triplet x86-mingw-dynamic install --no-downloads libconfig --head
+unset CC CXX
+```
+
+For gathering the prebuilt dlls and artifacts, I use the included script `update-windows-shared-libs.sh`, which basically does the below.
+
+```
+# Copying the correct DLLs for the right bitness of MinGW. update-windows-shared-libs.sh takes care of all that mess for you.
+
+cp "$VCPKG_ROOT/packages/curl_x64-mingw-dynamic/bin/libcurl.dll" lib_manually_provided/win64/
+cp "$VCPKG_ROOT/packages/libconfig_x64-mingw-dynamic/bin/libconfig.dll" lib_manually_provided/win64/
+cp "$VCPKG_ROOT/packages/zlib_x64-mingw-dynamic/bin/libzlib1.dll" lib_manually_provided/win64/
+cp "$VCPKG_ROOT/packages/openssl_x64-mingw-dynamic/bin/libssl-1_1-x64.dll" lib_manually_provided/win64/
+cp "$VCPKG_ROOT/packages/openssl_x64-mingw-dynamic/bin/libcrypto-1_1-x64.dll" lib_manually_provided/win64/
+
+cp "$VCPKG_ROOT/packages/curl_x86-mingw-dynamic/bin/libcurl.dll" lib_manually_provided/win32/
+cp "$VCPKG_ROOT/packages/libconfig_x86-mingw-dynamic/bin/libconfig.dll" lib_manually_provided/win32/
+cp "$VCPKG_ROOT/packages/zlib_x86-mingw-dynamic/bin/libzlib1.dll" lib_manually_provided/win32/
+cp "$VCPKG_ROOT/packages/openssl_x86-mingw-dynamic/bin/libssl-1_1.dll" lib_manually_provided/win32/
+cp "$VCPKG_ROOT/packages/openssl_x86-mingw-dynamic/bin/libcrypto-1_1.dll" lib_manually_provided/win32/
+
+# Headers are the same for 32-bit and 64-bit, doesn't matter which we choose from
+cp "$VCPKG_ROOT/packages/libconfig_x64-mingw-dynamic/include/libconfig.h" include_manually_provided/
+mkdir -p include_manually_provided/curl
+cp "$VCPKG_ROOT/packages/curl_x64-mingw-dynamic/include/curl/"*.h include_manually_provided/curl/
+```
+
+Then build CipesAtHome
+Unset CFLAGS and CXXFLAGS set above, as they are not appropriate for this Makefile.
+If you are doing this from a different 
+
+```
+# Skip this if your CFLAGS and CXXFLAGS aren't from the above vcpkg building
+unset CFLAGS CXXFLAGS
+
+# 64-bit build
+make clean
+env CC=$CC_64 FOR_DISTRIBUTION=1 USE_LTO=1 make -j4
+# Do whatever you need to do to package for Windows 64-bit release...
+
+# 32-bit
+make clean
+env CC=$CC_32 FOR_DISTRIBUTION=1 CFLAGS="-m32" USE_LTO=1 make -j4
+# Do whatever you need to do to package for Windows 32-bit release...
+```
+
+The "-avx2" build requires even further modifications and is not documented at this time. This may change in the future.
+
 # CipesAtHome (Original README.md starts here)
 
 ## Overview
@@ -139,6 +223,8 @@ To build on Linux, you will need to run the following commands to run this progr
 1. `./recipesAtHome`
 
 Should there be any problems in this building process, please let us know by posting an issue on Github.
+
+<a name="building-windows-original"></a>
 
 ### Windows
 To build on Windows, use the Visual Studio CipesAtHome.sln solution file. You will need to install libcurl and libconfig. This can be done by making use of vcpkg.
