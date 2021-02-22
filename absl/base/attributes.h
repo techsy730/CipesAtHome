@@ -632,7 +632,7 @@
 #if __has_feature(cxx_attributes) && __has_warning("-Wimplicit-fallthrough")
 #define ABSL_FALLTHROUGH_INTENDED [[clang::fallthrough]]
 #endif
-#elif defined(__GNUC__) && __GNUC__ >= 7
+#elif defined(__GNUC__) && __GNUC__ >= 7 && !defined(__MINGW32__)
 #define ABSL_FALLTHROUGH_INTENDED [[gnu::fallthrough]]
 #endif
 
