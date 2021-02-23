@@ -185,7 +185,7 @@ void applyJumpStorageFramePenalty(struct BranchPath *node) {
 }
 
 // This defines it, but the body is in the header for inlining.
-ABSL_ATTRIBUTE_ALWAYS_INLINE extern inline void copyCook(struct Cook *cookNew, struct Cook *cookOld);
+ABSL_ATTRIBUTE_ALWAYS_INLINE extern inline void copyCook(struct Cook *cookNew, const struct Cook *cookOld);
 
 /*-------------------------------------------------------------------
  * Function 	: copyOutputsFulfilled

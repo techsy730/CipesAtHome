@@ -120,7 +120,7 @@ void shiftUpLegalMoves(struct BranchPath* node, int startIndex);
  * 
  * A simple function to copy the data within cookOld to cookNew.
  -------------------------------------------------------------------*/
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline void copyCook(struct Cook *cookNew, struct Cook *cookOld) {
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline void copyCook(struct Cook *cookNew, const struct Cook *cookOld) {
 	*cookNew = *cookOld;
 	return;
 }

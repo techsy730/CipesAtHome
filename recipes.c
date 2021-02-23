@@ -577,7 +577,7 @@ int getIndexOfRecipe(enum Type_Sort item) {
  *
  * A simple memcpy to duplicate a previous instance of dependentRecipes.
  -------------------------------------------------------------------*/
-void copyDependentRecipes(int *newDependentRecipes, int *dependentRecipes) {
+void copyDependentRecipes(int *newDependentRecipes, const int *dependentRecipes) {
 	memcpy((void *)newDependentRecipes, (void *)dependentRecipes, sizeof(int) * NUM_RECIPES);
 }
 
