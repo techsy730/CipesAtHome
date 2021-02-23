@@ -16,6 +16,9 @@ update-windows-shared-libs() {
 		printf "You must specify \"VCPKG_ROOT\" to be the directory of your vcpkg installation, or you can give it as the first parameter to this script.\n"
 	fi
 	
+	[[ -d lib_manually_provided/win64-avx2 && -f "$VCPKG_ROOT/packages/curl_x64-v3-mingw-dynamic/bin/libcurl.dll" ]]
+	USING_AVX2_BUILD=$?
+	
 	OPEN_MP_DLLS=("libgomp-1.dll" "libwinpthread-1.dll")
 
 	if [ -z "${CC}" ]; then
@@ -27,8 +30,10 @@ update-windows-shared-libs() {
 	fi
 	# Print out commands as they are run and abort on first failure	
 	local -a OPEN_MP_DLL_LOCS_64
+	local -a OPEN_MP_DLL_LOCS_64_AVX2
 	local -a OPEN_MP_DLL_LOCS_32
 
+	set -e
 	for x in "${OPEN_MP_DLLS[@]}"; do 
 		OPEN_MP_DLL_LOCS_64+=($("${CC}" --print-file-name="$x"))
 		OPEN_MP_DLL_LOCS_32+=($("${CC_32}" --print-file-name="$x"))
@@ -36,6 +41,16 @@ update-windows-shared-libs() {
 	# Two bitness specific libs
   OPEN_MP_DLL_LOCS_64+=($("${CC}" --print-file-name="libgcc_s_seh-1.dll"))
   OPEN_MP_DLL_LOCS_32+=($("${CC_32}" --print-file-name="libgcc_s_sjlj-1.dll"))
+  
+  set +e
+	# Remember in shell land, 0 means true!
+  if [[ $USING_AVX2_BUILD == 0 ]]; then
+  	set -e
+		for x in "${OPEN_MP_DLLS[@]}"; do 
+			OPEN_MP_DLL_LOCS_64_AVX2+=($("${CC}" -march=haswell -mno-hle --print-file-name="$x"))
+		done
+	  OPEN_MP_DLL_LOCS_64_AVX2+=($("${CC}" -march=haswell -mno-hle --print-file-name="libgcc_s_seh-1.dll"))
+  fi
 	set -xe
 	for x in "${OPEN_MP_DLL_LOCS_64[@]}"; do 
 		cp "$x" lib_manually_provided/win64/
@@ -43,6 +58,13 @@ update-windows-shared-libs() {
 	for x in "${OPEN_MP_DLL_LOCS_32[@]}"; do 
 		cp "$x" lib_manually_provided/win32/
 	done
+	set +e
+	if [[ $USING_AVX2_BUILD == 0 ]]; then
+		set -e
+		for x in "${OPEN_MP_DLL_LOCS_64_AVX2[@]}"; do 
+			cp "$x" lib_manually_provided/win64-avx2/
+		done
+	fi
 
 	cp "$VCPKG_ROOT/packages/curl_x64-mingw-dynamic/bin/libcurl.dll" lib_manually_provided/win64/
 	cp "$VCPKG_ROOT/packages/libconfig_x64-mingw-dynamic/bin/libconfig.dll" lib_manually_provided/win64/
@@ -63,7 +85,8 @@ update-windows-shared-libs() {
 	
 	# Optional avx-2 build
 	set +xe
-	if [[ -d lib_manually_provided/win64-avx2 && -f "$VCPKG_ROOT/packages/curl_x64-v3-mingw-dynamic/bin/libcurl.dll" ]]; then
+	# Remember in shell land, 0 means true!
+	if [[ $USING_AVX2_BUILD == 0 ]]; then
 		set -xe
 		cp "$VCPKG_ROOT/packages/curl_x64-v3-mingw-dynamic/bin/libcurl.dll" lib_manually_provided/win64-avx2/
 		cp "$VCPKG_ROOT/packages/libconfig_x64-v3-mingw-dynamic/bin/libconfig.dll" lib_manually_provided/win64-avx2/
