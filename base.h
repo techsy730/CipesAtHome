@@ -26,14 +26,14 @@ extern "C" {
 
 // Most notable one this bring in is
 // _CIPES_IS_WINDOWS
-#include "base_essentials.h"
+#include "internal/base_essentials.h"
 
 extern bool _abrt_from_assert /*= false*/;
 
 // This brings in
 // _CIPES_STATIC_ASSERT
 // _assert_with_stacktrace
-#include "base_assert.h"
+#include "internal/base_assert.h"
 
 // For some ridiculous reason, even though it has been part of C11 for like a decade now,
 // some versions of Visual Studio do not support the "%z" printf specifier (for printing size_t's)

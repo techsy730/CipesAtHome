@@ -23,7 +23,7 @@ AVX2_BUILD_CFLAGS?=-march=haswell -mno-hle -mtune=generic
 EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
 FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG
 TARGET=recipesAtHome
-HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h base_essentials.h base_asserts.h semver.h $(wildcard absl/base/*.h)
+HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h $(wildcard absl/base/*.h)
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
