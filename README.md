@@ -7,7 +7,7 @@
 If you find any issues with my fork, you can file them on https://github.com/techsy730/CipesAtHome
 
 * A bunch of memory leaks fixed
-* Compile the "inner loop" C (currently `caliculator.c`, `recipes.c`, and `inventory.c`) files with `-O3`.
+* Compile the "inner loop" C files (currently `caliculator.c`, `recipes.c`, and `inventory.c`) with `-O3`.
 * A bunch of optimizations, especially reducing malloc churn
 * Cleaner shutdown, give the threads a chance to finish their work before shutting down (you can force it by giving the exit command (`ctrl-C` usually) multiple times.
 * Better (IMO) logging
@@ -30,7 +30,7 @@ There are three branches to choose from.
 Make sure to append these _before_ the `make` call (using env or something). Passing these into `make`'s parameters causes `make`
 to override these.
 
-**Note**: This obviously only works when using `make`. if you are building through Visual Studio, you won't get any of this.
+**Note**: This obviously only works when using `make`. If you are building through Visual Studio, you won't get any of this.
 
 This doesn't list all of them, but some of the ones normal users might be interested in.
 You can see all the important ones in the `Makefile`
@@ -76,7 +76,7 @@ compiler make an optimized binary that use this knowledge for better optimizatio
 
 #### Generating the instrumentation profile `PROFILE_GENERATE=1`
 
-For CipesAtHome, you can accomplish this by building with `PROFILE_GENERATE=1`, which will generate an intstrumented binary.
+For recipesAtHome, you can accomplish this by building with `PROFILE_GENERATE=1`, which will generate an intstrumented binary.
 This binary will dump instrumentation data (the "hot" vs "cold" data mentioned above) to files in a subfolder called `prof/`
 (the exact files in the folder will depend on your compiler).
 
@@ -99,7 +99,7 @@ Then rebuild using `PROFILE_USE=1` (and unset `PROFILE_GENERATE` or set it to `0
 picked up and you will get an even more optimized binary.
 
 Make sure to copy (I highly suggest copy, not move, to keep a backup) `results.BAK` to `results`.
-Now run your
+Now run your slightly faster recipesAtHome for slightly faster cooking
 
 ### Building/Releasing
 
@@ -129,13 +129,13 @@ Then build using
 
 ```
 # 64-bit build
-export CC=$CC_64
-export CXX=$_64
+export CC="$CC_64"
+export CXX="$CXX_64"
 vcpkg --triplet x64-mingw-dynamic install curl
 vcpkg --triplet x64-mingw-dynamic install libconfig --head 
 # 32-bit build (--no-downloads to prevent the case of another version being downloaded and having inconsistent versions)
-export CC=CC_32
-export CXX=CC_32
+export CC="$CC_32"
+export CXX="$CXX_32"
 vcpkg --triplet x86-mingw-dynamic install --no-downloads curl
 vcpkg --triplet x86-mingw-dynamic install --no-downloads libconfig --head
 unset CC CXX
@@ -165,8 +165,7 @@ cp "$VCPKG_ROOT/packages/curl_x64-mingw-dynamic/include/curl/"*.h include_manual
 ```
 
 Then build CipesAtHome
-Unset CFLAGS and CXXFLAGS set above, as they are not appropriate for this Makefile.
-If you are doing this from a different 
+Unset CFLAGS and CXXFLAGS set above, as they are not appropriate for this Makefile. 
 
 ```
 # Skip this if your CFLAGS and CXXFLAGS aren't from the above vcpkg building
