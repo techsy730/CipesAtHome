@@ -10,12 +10,6 @@
 #include "absl/base/port.h"
 #include <assert.h>
 
-#ifdef INCLUDE_STACK_TRACES
-#ifdef __GLIBC__ // Sorely lacking, but hopefully should work good enough.
-#include <execinfo.h>
-#endif
-#endif
-
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ < 201112L
 #error recipesAtHome requires at least C11 mode to build
 #endif
@@ -35,6 +29,8 @@ extern bool _abrt_from_assert /*= false*/;
 // _assert_with_stacktrace
 #include "internal/base_assert.h"
 
+_CIPES_STATIC_ASSERT(true == 1, "true from stdbool.h must be 1 for the math to work correctly");
+
 // For some ridiculous reason, even though it has been part of C11 for like a decade now,
 // some versions of Visual Studio do not support the "%z" printf specifier (for printing size_t's)
 // So gotta work around it if that happens.
@@ -42,28 +38,41 @@ extern bool _abrt_from_assert /*= false*/;
 #if _CIPES_IS_WINDOWS && (!defined(_MSC_VER) || _MSV_VER < 1800)
 #define _zf "%I64d"
 #define _zuf "%I64u"
+#define _zxf "%I64x"
 #else
 #define _zf "%z"
 #define _zuf "%zu"
+#define _zxf "%zx"
 #endif
 
+// To avoid circular dep onto stacktrace.h
 #ifdef INCLUDE_STACK_TRACES
-#define STACK_TRACE_FRAMES 15
-ABSL_ATTRIBUTE_NOINLINE void printStackTraceF(FILE* f);
+void printStackTraceF(FILE* f);
 #else
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline void printStackTraceF(FILE* f) {}
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline void printStackTraceF(FILE* f);
 #endif
+#if defined(INCLUDE_STACK_TRACES) && _CIPES_IS_WINDOWS
+void prepareStackTraces();
+#else
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline void prepareStackTraces();
+#endif
+
+bool requestShutdown();
 
 #if !NO_PRINT_ON_MALLOC_FAIL
 ABSL_ATTRIBUTE_ALWAYS_INLINE
 #endif
 ABSL_ATTRIBUTE_COLD
 inline void handleMallocFailure() {
+  requestShutdown();
 #if !NO_PRINT_ON_MALLOC_FAIL
+#pragma omp critical(printing_on_failure)
+  {
+    printStackTraceF(stderr);
     fprintf(stderr, "Fatal error! Ran out of heap memory.\n");
     fprintf(stderr, "Press enter to quit.\n");
-    printStackTraceF(stderr);
     ABSL_ATTRIBUTE_UNUSED char exitChar = getchar();
+  }
 #endif
 }
 

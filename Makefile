@@ -23,8 +23,8 @@ AVX2_BUILD_CFLAGS?=-march=haswell -mno-hle -mtune=generic
 EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
 FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG
 TARGET=recipesAtHome
-HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h $(wildcard absl/base/*.h)
-OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o
+HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h $(wildcard absl/base/*.h)
+OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
 # Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
