@@ -11,7 +11,7 @@
 #endif
 
 // Eclipse does not like static_assert in C code even though it is part of the standard now.
-// The __CDT_PARSER__ macro is only active for Eclipse's parsing for symbols, not it's compilation.
+// The __CDT_PARSER__ macro is only active for Eclipse's parsing for symbols, not its compilation.
 #ifdef __CDT_PARSER__
 #define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_OK
 // __cplusplus == 201103L means C++11
@@ -24,55 +24,65 @@ COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
 #define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_OK
 #endif
 
-_CIPES_STATIC_ASSERT(true == 1, "true from stdbool.h must be 1 for the math to work correctly");
-
 #ifdef NDEBUG
-#define _assert_with_stacktrace(condition) _REQUIRE_SEMICOLON
+#define _assert_with_stacktrace(condition) ABSL_INTERNAL_ASSUME(condition)
 #elif NO_STACK_TRACE_ASSERT
-#define _assert_with_stacktrace(condition) assert((condition))
+#define _assert_with_stacktrace(condition) assert(condition)
 #elif defined(INCLUDE_STACK_TRACES)
 #if __cplusplus >= 201103L // C++11 or greater
 #define _assert_with_stacktrace(condition) ({ \
   auto _condition = ABSL_PREDICT_TRUE((condition)_; \
   if (!_condition) { \
   	_abrt_from_assert = true; \
-  	printStackTraceF(stderr); \
-  	fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
-  	assert((condition)); \
+    _Pragma("omp critical(printing_on_failure)") \
+		{ \
+			printStackTraceF(stderr); \
+			fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
+		} \
+  	assert(condition); \
 	} \
 })
 #elif SUPPORTS_AUTOTYPE && !defined(__CDT_PARSER__)
 #define _assert_with_stacktrace(condition) ({ \
-  __auto_type _condition = ABSL_PREDICT_TRUE((condition)); \
+  __auto_type _condition = ABSL_PREDICT_TRUE(condition); \
   if (!_condition) { \
-  	_abrt_from_assert = true; \
-  	printStackTraceF(stderr); \
-		fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
-  	assert((condition)); \
+		_abrt_from_assert = true; \
+  	_Pragma("omp critical(printing_on_failure)") \
+		{ \
+			printStackTraceF(stderr); \
+			fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
+		} \
+		assert(condition); \
   } \
 })
 #elif SUPPORTS_TYPEOF
 #define _assert_with_stacktrace(condition) ({ \
-  typeof(condition) _condition = ABSL_PREDICT_TRUE((condition)); \
+  typeof(condition) _condition = ABSL_PREDICT_TRUE(condition); \
   if (!_condition) { \
-  	_abrt_from_assert = true; \
-  	printStackTraceF(stderr); \
-		fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
-  	assert((condition)); \
+		_abrt_from_assert = true; \
+  	_Pragma("omp critical(printing_on_failure)") \
+		{ \
+			printStackTraceF(stderr); \
+			fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
+		} \
+		assert(condition); \
 	} \
 })
 #else
 #define _assert_with_stacktrace(condition) ({ \
-  if (! ABSL_PREDICT_TRUE((condition))) { \
+  if (! ABSL_PREDICT_TRUE(condition)) { \
   	_abrt_from_assert = true; \
-  	printStackTraceF(stderr); \
-		fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
-  	assert((condition)); \
+  	_Pragma("omp critical(printing_on_failure)") \
+		{ \
+			printStackTraceF(stderr); \
+			fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
+		} \
+  	assert(condition); \
 	} \
 })
 #endif
 #else
-#define _assert_with_stacktrace(condition) assert((condition))
+#define _assert_with_stacktrace(condition) assert(condition)
 #endif
 
 #endif /* _CIPES_BASE_ASSERT_H */
