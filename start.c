@@ -82,10 +82,11 @@ void handleTermSignal(int signum) {
 }
 
 void handleAbrtSignal(int signum) {
+	// First off, reset our signal handler to default in case we encounter another signal in trying to print out debugging info, we don't loop.
+	signal(signum, SIG_DFL);
 	if (signum != SIGABRT || (!_abrt_from_assert && signum == SIGABRT)) {
 		printStackTraceF(stderr);
 	}
-	signal(signum, SIG_DFL);
 	raise(signum);
 }
 
@@ -133,7 +134,7 @@ void setSignalHandlers() {
 	}
 #endif
 }
-	
+
 int main(int argc, char **argv) {
 
 	int max_outer_loops = -1;
@@ -155,11 +156,17 @@ int main(int argc, char **argv) {
 	// The debug setting can only be meaningfully used with one thread as well.
 	int workerCount = (getConfigInt("select") || getConfigInt("randomise"))
 					  && !getConfigInt("debug") ? getConfigInt("workerCount") : 1;
+
+	// Create workerCount threads
+	omp_set_num_threads(workerCount);
+
+	prepareStackTraces();
+
 	local_ver = getConfigStr("Version");
 	init_level_cfg();
 	curl_global_init(CURL_GLOBAL_DEFAULT);	// Initialize libcurl
 	int update = checkForUpdates(local_ver);
-	
+
 	if (update == -1) {
 		printf("Could not check version on Github. Please check your internet connection.\n");
 		printf("Otherwise, we can't submit completed roadmaps to the server!\n");
@@ -244,11 +251,8 @@ int main(int argc, char **argv) {
 	// persist through all parallel calls to calculator.c
 	initializeInvFrames();
 	initializeRecipeList();
-	
+
 	setSignalHandlers();
-	
-	// Create workerCount threads
-	omp_set_num_threads(workerCount);
 
 	// copying to const so OpenMP knows it doesn't have to have each thread
 	// recheck this.
@@ -260,27 +264,32 @@ int main(int argc, char **argv) {
 		long cycle_count = 0;
 		int rawID = omp_get_thread_num();
 		int displayID = rawID + 1;
-		
-		printf("[Thread %d/%d][Started]\n", displayID, workerCount);
-		
+
+#pragma omp critical(printing_on_failure)
+		{
+			printf("[Thread %d/%d][Started]\n", displayID, workerCount);
+		}
+
 		// Seed each thread's PRNG for the select and randomise config options
 		srand(((int)time(NULL)) ^ rawID);
-		
+
 		while (max_outer_loops_fixed < 0 || cycle_count < max_outer_loops_fixed) {
 			if (askedToShutdown()) {
 				break;
 			}
 			++cycle_count;
 			struct Result result = calculateOrder(rawID, max_branches_fixed);
-			
+
 			// result might store -1 frames for errors that might be recoverable
 			if (result.frames > -1) {
 				testRecord(result.frames);
 			}
 		}
-
-		printf("[Thread %d/%d][Done]\n", displayID, workerCount);
+#pragma omp critical(printing_on_failure)
+		{
+			printf("[Thread %d/%d][Done]\n", displayID, workerCount);
+		}
 	}
-	
+
 	return 0;
 }

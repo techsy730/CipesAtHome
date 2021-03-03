@@ -12,7 +12,7 @@ CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-opti
 EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
 CFLAGS:=-I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
-DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DDEBUG=1
+DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3
 GCC_ONLY_HIGH_OPT_CFLAGS?=
@@ -23,8 +23,8 @@ AVX2_BUILD_CFLAGS?=-march=haswell -mno-hle -mtune=generic
 EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
 FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG
 TARGET=recipesAtHome
-HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h semver.h $(wildcard absl/base/*.h)
-OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o
+HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h $(wildcard absl/base/*.h)
+OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 
 # Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
@@ -192,7 +192,6 @@ CFLAGS:=$(WARNINGS_AND_ERRORS) $(CFLAGS)
 
 ifeq (1,$(FOR_DISTRIBUTION))
 ifeq (1,$(IS_WINDOWS))
-	_OPEN_MP_DLL_LOCATION=$(shell $(CC) --print-file-name=libgomp-1.dll)
 	# FINAL_STATIC_LINKS+=
 	# FINAL_TARGET_CFLAGS+=
 	EXTERNAL_LIBS+=-Iinclude_manually_provided -Llib_manually_provided/win
@@ -340,6 +339,12 @@ ifeq (1,$(DEBUG))
 	endif
 	ifeq (1,$(DEBUG_EXTRA))
 		DEBUG_CFLAGS+=$(DEBUG_EXTRA_CFLAGS)
+		ifeq (1,$(IS_WINDOWS))
+			# EXTERNAL_LIBS+=-
+		endif
+	endif
+	ifeq (1,$(IS_WINDOWS))
+		DEBUG_CFLAGS:=$(filter-out -rdynamic,$(DEBUG_CFLAGS))
 	endif
 	CFLAGS+=$(DEBUG_CFLAGS)
 	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)

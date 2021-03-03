@@ -8,6 +8,6 @@
 
 typedef bool outputCreatedArray_t[NUM_RECIPES];
 
-void copyDependentRecipes(int *newDependentRecipes, int *dependentRecipes);
+void copyDependentRecipes(int *newDependentRecipes, const int *dependentRecipes);
 
 #endif
