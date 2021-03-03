@@ -33,14 +33,14 @@
 #define ITERATION_LIMIT_INCREASE 5000000l // Amount to increase the iteration limit by when finding a new PB
 // Basically 2.5*ITERATION_LIMIT_INCREASE, but keeps floats out of it so we can static_assert on it
 #define ITERATION_LIMIT_INCREASE_FIRST ((ITERATION_LIMIT_INCREASE << 1) + (ITERATION_LIMIT_INCREASE >> 1)) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
-#define ITERATION_LIMIT_MAX 30*ITERATION_LIMIT_INCREASE // Maxumum iteration limit before increases shrink drastically (a soft maximum)
-#define ITERATION_LIMIT_INCREASE_PAST_MAX 1000l // Amount to increase the iteration limit by when finding a new record when past the max
+#define ITERATION_LIMIT_MAX (30*ITERATION_LIMIT_INCREASE) // Maxumum iteration limit before increases shrink drastically (a soft maximum)
+#define ITERATION_LIMIT_INCREASE_PAST_MAX (ITERATION_LIMIT_INCREASE/500) // Amount to increase the iteration limit by when finding a new record when past the max
 #define SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE 25 // Chance (out of 100) for the select strategy to skip a seemingly good next move
 #define DEFAULT_CAPACITY_FOR_EMPTY 8 // When initializing a dynamically sized array, an empty/NULL array will be initialized to an Array of this size on a new element add
 #define CAPACITY_INCREASE_FACTOR 1.5 // When a dynamically sized array is full, increase capacity by this factor
 #define CAPACITY_DECREASE_THRESHOLD 0.25 // When a dynamically sized array element count is below this fraction of the capacity, shrink it
 #define CAPACITY_DECREASE_FACTOR 0.35 // When a dynamically sized array is shrunk, shrink it below this factor
-#define CAPACITY_DECREASE_FLOOR 2*DEFAULT_CAPACITY_FOR_EMPTY // Never shrink a dynamically sized array below this capacity
+#define CAPACITY_DECREASE_FLOOR (2*DEFAULT_CAPACITY_FOR_EMPTY) // Never shrink a dynamically sized array below this capacity
 #define CHECK_SHUTDOWN_INTERVAL 200
 
 #define NEW_BRANCH_LOG_LEVEL 3
