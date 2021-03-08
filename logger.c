@@ -51,14 +51,13 @@ int recipeLog(int level, char *process, char *subProcess, char *activity, char *
 		fputs(data, fp);
 
 		fclose(fp);
-		
+
 		if (need_data_free) {
 			free(data);
 			data = NULL;
-		} else {
-			// Effectively empty out now old data.
-			data[0] = 0;
 		}
+		// Effectively empty out now old data.
+		shared_data[0] = 0;
 	}
 	return 0;
 }

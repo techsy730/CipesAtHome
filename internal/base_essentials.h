@@ -49,15 +49,19 @@
 // __cplusplus == 201103L means C++11
 #ifdef __cplusplus
 #if __cplusplus >= 201103L && !defined(__CDT_PARSER__)
-#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK static_assert(true, "Never should see this error")
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(DoNotUse)
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(n) static_assert(true, "Never should see this error")
 #else
-#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK struct ABSL_ATTRIBUTE_UNUSED __DoNotUse
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(DoNotUse)
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(n) struct ABSL_ATTRIBUTE_UNUSED __##n
 #endif
 #elif (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L) && !defined(__CDT_PARSER__)
 // __STDC_VERSION__ == 201112L means C11
-#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _Static_assert(true, "Never should see this error")
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse)
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(ignored) _Static_assert(true, "Never should see this error")
 #else
-#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK ABSL_ATTRIBUTE_UNUSED static int __doNotUse
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK ABSL_ATTRIBUTE_UNUSED _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse)
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(n) ABSL_ATTRIBUTE_UNUSED static int __##n
 #endif
 
 // Will NOT work in top level, use _REQUIRE_SEMICOLON_TOP_LEVEL_OK for that

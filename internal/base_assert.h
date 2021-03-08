@@ -13,7 +13,7 @@
 // Eclipse does not like static_assert in C code even though it is part of the standard now.
 // The __CDT_PARSER__ macro is only active for Eclipse's parsing for symbols, not its compilation.
 #ifdef __CDT_PARSER__
-#define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_OK
+#define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse_stubbedOutStaticAssert)
 // __cplusplus == 201103L means C++11
 // __STDC_VERSION__ == 201112L means C11
 #elif (defined(__cplusplus) && __cplusplus >= 201103L) \
@@ -21,7 +21,7 @@
 #define _CIPES_STATIC_ASSERT(condition, message) static_assert(condition, message ": " #condition " (" _XSTR(condition) ") is NOT true")
 #else
 COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
-#define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_OK
+#define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse_stubbedOutStaticAssert)
 #endif
 
 #ifdef NDEBUG
