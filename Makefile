@@ -12,7 +12,7 @@ CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-opti
 EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
 CFLAGS:=-I . -O2 $(CFLAGS)
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
-DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1
+DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DVERIFYING_SHIFTING_FUNCTIONS=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 HIGH_OPT_CFLAGS?=-O3
 GCC_ONLY_HIGH_OPT_CFLAGS?=
@@ -21,7 +21,9 @@ GCC_ONLY_HIGH_OPT_CFLAGS?=
 # An intersection of -march=haswell and -march=bdver4 (as of gcc-9) is the most concise way to express this (until gcc-11 and clang-12)
 AVX2_BUILD_CFLAGS?=-march=haswell -mno-hle -mtune=generic
 EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
-FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG
+FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG -DFAST_BUT_NO_VERIFY=1
+GCC_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
+CLANG_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
 TARGET=recipesAtHome
 HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h $(wildcard absl/base/*.h)
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
@@ -231,6 +233,11 @@ ifeq (gcc,$(COMPILER))
 endif
 ifeq (1,$(FAST_CFLAGS_BUT_NO_VERIFICATION))
 	CFLAGS+=$(FAST_CFLAGS_BUT_NO_VERIFY)
+	ifeq (gcc,$(COMPILER))
+		CFLAGS+=$(GCC_ONLY_FAST_CFLAGS_BUT_NO_VERIFY)
+	else ifeq (clang,$(COMPILER))
+		CFLAGS+=$(CLANG_ONLY_FAST_CFLAGS_BUT_NO_VERIFY)
+	endif
 endif
 ifeq (1,$(EXPERIMENTAL_OPTIMIZATIONS))
 	CFLAGS+=$(EXPERIMENTAL_OPT_CFLAGS)

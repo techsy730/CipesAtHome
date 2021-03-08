@@ -589,6 +589,17 @@ void freeAllNodes(struct BranchPath *node) {
 	} while (node != NULL);
 }
 
+/*-------------------------------------------------------------------
+ * Function 	: freeLegalMoveOnly
+ * Inputs	: struct BranchPath	*node
+ *		  int			index
+ *
+ * Free the legal move at index in the node's array of legal moves,
+ * but unlike freeLegalMove(), this does NOT shift the existing legal
+ * moves to fill the gap. This is useful in cases where where the
+ * caller can assure such consistency is not needed (For example,
+ * freeing the last legal move or freeing all legal moves).
+ -------------------------------------------------------------------*/
 static void freeLegalMoveOnly(struct BranchPath *node, int index) {
 	freeNode(node->legalMoves[index]);
 	node->legalMoves[index] = NULL;
@@ -622,12 +633,13 @@ void freeNode(struct BranchPath *node) {
 		free(node->description.data);
 	}
 	if (node->legalMoves != NULL) {
-		int i = node->numLegalMoves;
-		while (--i >= 0) {
+		const int max = node->numLegalMoves;
+		int i = 0;
+		while (i < max) {
 			// Don't need to worry about shifting up when we do this.
 			// Or resetting slots to NULL.
 			// We are blowing it all away anyways.
-			freeLegalMoveOnly(node, i);
+			freeLegalMoveOnly(node, i++);
 		}
 		free(node->legalMoves);
 	}
@@ -1237,6 +1249,7 @@ void handleSelectAndRandom(struct BranchPath *curNode, int select, int randomise
 		struct BranchPath *nextMove = curNode->legalMoves[nextMoveIndex];
 		curNode->legalMoves[nextMoveIndex] = NULL;
 		shiftDownLegalMoves(curNode, 0, nextMoveIndex);
+		_assert_with_stacktrace(curNode != nextMove);
 		curNode->legalMoves[0] = nextMove;
 	}
 
@@ -1319,10 +1332,12 @@ struct CapacityComputationResult {
 	bool needsShrink;
 };
 
-static struct CapacityComputationResult capacityCompute(const ssize_t currentCapacity, const int minNewSize) {
+static struct CapacityComputationResult capacityCompute(const ssize_t currentCapacity, int minNewSize) {
 	ssize_t newCapacity = currentCapacity;
 	bool needsRealloc = false;
 	bool needsShrink = false;
+	// Always allocate at least one more then what the user asked for.
+	++minNewSize;
 	ssize_t shrinkThreshold = (ssize_t)(CAPACITY_DECREASE_THRESHOLD * newCapacity);
 	if (currentCapacity == 0) {
 		newCapacity = DEFAULT_CAPACITY_FOR_EMPTY;
@@ -1339,9 +1354,9 @@ static struct CapacityComputationResult capacityCompute(const ssize_t currentCap
 		if (shrunkCapacity < CAPACITY_DECREASE_FLOOR) {
 			shrunkCapacity = CAPACITY_DECREASE_FLOOR;
 		}
-		if (shrunkCapacity < minNewSize + 1) {
+		if (shrunkCapacity < minNewSize) {
 			// Shrunk too much, just fit the array exactly (always leave at least one slot after)
-			shrunkCapacity = minNewSize + 1;
+			shrunkCapacity = minNewSize;
 		}
 		if (shrunkCapacity < currentCapacity) {
 			needsRealloc = true;
@@ -1351,7 +1366,7 @@ static struct CapacityComputationResult capacityCompute(const ssize_t currentCap
 	}
 	if (needsRealloc) {
 		// Safeguard, make sure we are at least increasing it by a little.
-		_assert_with_stacktrace(newCapacity >= minNewSize + 1);
+		_assert_with_stacktrace(newCapacity >= minNewSize);
 		// The above logic should _never_ shrink when we were expecting increase.
 		_assert_with_stacktrace(needsShrink || newCapacity > currentCapacity);
 	}
@@ -1394,6 +1409,7 @@ void insertIntoLegalMoves(int insertIndex, struct BranchPath *mutableNewLegalMov
 	}*/
 
 	// Place newLegalMove in index insertIndex
+	_assert_with_stacktrace(curNode != newLegalMove);
 	curNode->legalMoves[insertIndex] = mutableNewLegalMove;
 
 	// Increase numLegalMoves
@@ -2066,6 +2082,14 @@ int selectSecondItemFirst(int *ingredientLoc, size_t nulls, int viableItems) {
 		   && (ingredientLoc[0] - (int)nulls) >= viableItems/2;
 }
 
+#ifdef VERIFYING_SHIFTING_FUNCTIONS
+#define _assert_for_shifting_function(condition) _assert_with_stacktrace(condition)
+// #elif defined(FAST_BUT_NO_VERIFY)
+#else
+#define _assert_for_shifting_function(condition) ABSL_INTERNAL_ASSUME_NO_ASSERT(condition)
+// #define _assert_for_shifting_function(condition)
+#endif
+
 /*-------------------------------------------------------------------
  * Function 	: shiftDownLegalMoves
  * Inputs	: struct BranchPath	*node
@@ -2074,13 +2098,30 @@ int selectSecondItemFirst(int *ingredientLoc, size_t nulls, int viableItems) {
  *
  * If this function is called, we want to make room in the legal moves
  * array to place a new legal move. Shift all legal moves starting at
- * lowerBound one index towards the end of the list, ending at upperBound
+ * lowerBound one index towards the end of the list, ending at upperBound.
+ * NOTE: Although a total of (upperBound - lowerBound) total elements are moved,
+ * both lowerBound and upperBound (both inclusive) are referenced, unless
+ * they are equal, in which case this function does nothing.
+ *
+ * This function does NOT update node->numLegalMoves. Caller should do
+ * it themselves. (Unless the function is only
+ * moving existing legal moves around, in which case it would be correct
+ * to not increment it)
  -------------------------------------------------------------------*/
 void shiftDownLegalMoves(struct BranchPath *node, int lowerBound, int uppderBound) {
+	if (uppderBound == lowerBound) return;
+	_assert_for_shifting_function(node != NULL);
+	_assert_for_shifting_function(node->numLegalMoves <= node->capacityLegalMoves);
+	_assert_for_shifting_function(lowerBound >= 0);
+	_assert_for_shifting_function(uppderBound >= 0);
+	_assert_for_shifting_function(uppderBound >= lowerBound);
+	_assert_for_shifting_function(lowerBound < node->numLegalMoves);
+	_assert_for_shifting_function(uppderBound <= node->numLegalMoves);
   struct BranchPath **legalMoves = node->legalMoves;
-	for (int i = uppderBound - 1; i >= lowerBound; i--) {
+  memmove(&legalMoves[lowerBound + 1], &legalMoves[lowerBound], sizeof(&legalMoves[0])*(uppderBound - lowerBound));
+	/*for (int i = uppderBound - 1; i >= lowerBound; i--) {
 		legalMoves[i+1] = legalMoves[i];
-	}
+	}*/
 }
 
 /*-------------------------------------------------------------------
@@ -2092,13 +2133,38 @@ void shiftDownLegalMoves(struct BranchPath *node, int lowerBound, int uppderBoun
  * move AFTER the null is index. Iterate starting at the index of the
  * NULL legal moves and shift all subsequent legal moves towards the
  * front of the array.
+ * WARNING: node->numLegalMove MUST already be decremented before
+ * calling this function. Thus this function will actually edit
+ * node->legalModes[node->numLegalMoves] on the assumption that
+ * numLegalMoves is actually now below the allocated region.
+ * NOTE: the destination actually starts with index - 1. If index == 0,
+ * then you are asking to shift down index 0, which is already at the top,
+ * so this function will do nothing.
+ *
+ * This function does NOT update node->numLegalMoves. Caller should
+ * do it themselves.
  -------------------------------------------------------------------*/
 void shiftUpLegalMoves(struct BranchPath *node, int startIndex) {
-	for (int i = startIndex - 1; i < node->numLegalMoves; i++) {
-		node->legalMoves[i] = node->legalMoves[i+1];
+	if (startIndex == 0) return;
+	_assert_for_shifting_function(node != NULL);
+	struct BranchPath **legalMoves = node->legalMoves;
+#ifdef VERIFYING_SHIFTING_FUNCTIONS
+	if (startIndex == node->numLegalMoves + 1) {
+		// Null where the last entry was before shifting
+		legalMoves[node->numLegalMoves] = NULL;
+		return;
 	}
+#endif
+	_assert_for_shifting_function(node->numLegalMoves >= 0);
+	_assert_for_shifting_function(startIndex >= 1);
+	_assert_for_shifting_function(startIndex <= node->numLegalMoves);
+	_assert_for_shifting_function(node->numLegalMoves < node->capacityLegalMoves);
+	memmove(&legalMoves[startIndex - 1], &legalMoves[startIndex], sizeof(&legalMoves[0])*(node->numLegalMoves - startIndex + 1));
+	/*for (int i = startIndex; i <= node->numLegalMoves; i++) {
+		node->legalMoves[i-1] = node->legalMoves[i];
+	}*/
 	// Null where the last entry was before shifting
-	node->legalMoves[node->numLegalMoves] = NULL;
+	legalMoves[node->numLegalMoves] = NULL;
 }
 
 /*-------------------------------------------------------------------
@@ -2157,6 +2223,7 @@ void softMin(struct BranchPath *node) {
 	shiftDownLegalMoves(node, 0, index);
 
 	// Set first index in array to the softMinNode
+	_assert_with_stacktrace(node != softMinNode);
 	node->legalMoves[0] = softMinNode;
 }
 
