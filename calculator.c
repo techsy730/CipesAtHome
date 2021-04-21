@@ -26,26 +26,27 @@
 
 // User configurable tunables
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
+#define BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE BUFFER_SEARCH_FRAMES + 150		// Threshold for closeness to the current record to try spending more time on the branch
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
-#define DEFAULT_ITERATION_LIMIT 125000l // Cutoff for iterations explored before resetting
-#define DEFAULT_ITERATION_LIMIT_SHORT 50000l // Cutoff for iterations explored before resetting when short branches is randomly selected
+#define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
+#define DEFAULT_ITERATION_LIMIT_SHORT 65000l // Cutoff for iterations explored before resetting when short branches is randomly selected
 #define SHORT_ITERATION_LIMIT_CHANCE 40 // Chance (out of 100) for a thread to choose DEFAULT_ITERATION_LIMIT_SHORT instead of DEFAULT_ITERATION_LIMIT when starting a new branch
 #define ITERATION_LIMIT_INCREASE 5000000l // Amount to increase the iteration limit by when finding a new PB
 // Basically 2.5*ITERATION_LIMIT_INCREASE, but keeps floats out of it so we can static_assert on it
 #define ITERATION_LIMIT_INCREASE_FIRST ((ITERATION_LIMIT_INCREASE << 1) + (ITERATION_LIMIT_INCREASE >> 1)) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
 #define ITERATION_LIMIT_MAX (30*ITERATION_LIMIT_INCREASE) // Maxumum iteration limit before increases shrink drastically (a soft maximum)
 #define ITERATION_LIMIT_INCREASE_PAST_MAX (ITERATION_LIMIT_INCREASE/500) // Amount to increase the iteration limit by when finding a new record when past the max
+#define ITERATION_LIMIT_INCREASE_GETTING_CLOSE ITERATION_LIMIT_INCREASE / 4
+#define ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE ITERATION_LIMIT_INCREASE_GETTING_CLOSE / 4
 #define SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE 25 // Chance (out of 100) for the select strategy to skip a seemingly good next move
 #define DEFAULT_CAPACITY_FOR_EMPTY 8 // When initializing a dynamically sized array, an empty/NULL array will be initialized to an Array of this size on a new element add
 #define CAPACITY_INCREASE_FACTOR 1.5 // When a dynamically sized array is full, increase capacity by this factor
 #define CAPACITY_DECREASE_THRESHOLD 0.25 // When a dynamically sized array element count is below this fraction of the capacity, shrink it
 #define CAPACITY_DECREASE_FACTOR 0.35 // When a dynamically sized array is shrunk, shrink it below this factor
 #define CAPACITY_DECREASE_FLOOR (2*DEFAULT_CAPACITY_FOR_EMPTY) // Never shrink a dynamically sized array below this capacity
-#define CHECK_SHUTDOWN_INTERVAL 200
+#define CHECK_SHUTDOWN_INTERVAL 1000
 
 #define NEW_BRANCH_LOG_LEVEL 3
-
-#define CHECK_SHUTDOWN_INTERVAL 200
 
 #define INDEX_ITEM_UNDEFINED -1
 
@@ -58,6 +59,8 @@ _CIPES_STATIC_ASSERT(SHORT_ITERATION_LIMIT_CHANCE >= 0, "Chance to use short ite
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_FIRST <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_PAST_MAX <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_PAST_MAX <= ITERATION_LIMIT_INCREASE, "The small Iteration limit (for when past ITERATION_LIMIT_MAX) must be <= the normal iteration limit increase");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_GETTING_CLOSE <= ITERATION_LIMIT_INCREASE_FIRST, "The 'getting close' iteration limit increase must be less then the first PB increase.");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_GETTING_CLOSE <= ITERATION_LIMIT_MAX, "The 'getting close' iteration limit increase must be <= then iteration limit maximum");
 _CIPES_STATIC_ASSERT(SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE < 100, "Chance to skip greedy, seemingly best move must be < 100");
 _CIPES_STATIC_ASSERT(SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE >= 0, "Chance to skip greedy, seemingly best move must be >= 0");
 _CIPES_STATIC_ASSERT(CHECK_SHUTDOWN_INTERVAL > 0, "Check for shutdown interval must be > 0");
@@ -2424,6 +2427,14 @@ struct Inventory getSortedInventory(struct Inventory inventory, enum Action sort
 	}
 }
 
+static void logWithThreadInfo(int ID, char* toLogStr, int level) {
+	if (will_log_level(level)) {
+		char callString[30];
+		sprintf(callString, "Thread %d", ID);
+		recipeLog(level, "Calculator", "Info", callString, toLogStr);
+	}
+}
+
 static void logIterations(int ID, int stepIndex, const struct BranchPath * curNode, long iterationCount, long iterationLimit, int level)
 {
 	if (will_log_level(level)) {
@@ -2436,14 +2447,20 @@ static void logIterations(int ID, int stepIndex, const struct BranchPath * curNo
 	}
 }
 
-static void logIterationsAfterPB(int ID, int stepIndex, const struct BranchPath * curNode, int afterOptimizingFrames, long iterationCount, long oldIterationLimit, long iterationLimit, int level)
+static void logIterationsAfterLimitIncrease(int ID, int stepIndex, const struct BranchPath * curNode, int afterOptimizingFrames, long iterationCount, long oldIterationLimit, long iterationLimit, int level)
 {
 	if (will_log_level(level)) {
 		char callString[30];
+		char afterOptimizing[50];
 		char iterationString[300];
 		sprintf(callString, "Thread %d", ID);
-		sprintf(iterationString, "%d steps currently taken, %d (%d after optimizing) frames accumulated so far; %ldk iterations (%ldk previous iteration max, %ldk new iteration max)",
-			stepIndex, curNode->description.totalFramesTaken, afterOptimizingFrames, iterationCount / 1000, oldIterationLimit / 1000, iterationLimit / 1000);
+		if (afterOptimizingFrames < 0 || afterOptimizingFrames > UNSET_FRAME_RECORD) {
+			afterOptimizing[0] = 0;
+		} else {
+			sprintf(afterOptimizing, " (%d after optimizing)", afterOptimizingFrames);
+		}
+		sprintf(iterationString, "%d steps currently taken, %d%s; %ldk iterations (%ldk previous iteration max, %ldk new iteration max)",
+			stepIndex, curNode->description.totalFramesTaken, afterOptimizing, iterationCount / 1000, oldIterationLimit / 1000, iterationLimit / 1000);
 		recipeLog(level, "Calculator", "Info", callString, iterationString);
 	}
 }
@@ -2488,6 +2505,10 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 		long iterationCount = 0;
 		bool useShortIterationLimit = (rand() % 100) < SHORT_ITERATION_LIMIT_CHANCE;
 		long iterationLimit = useShortIterationLimit ? DEFAULT_ITERATION_LIMIT_SHORT : DEFAULT_ITERATION_LIMIT;
+		bool iterationLimitIncreased = false;
+		bool iterationLimitIncreasedFromPB = false;
+		bool iterationLimitIncreasedFromGettingClose = false;
+		bool iterationLimitIncreasedFromGettingKindOfClose = false;
 
 		// Create root of tree path
 		curNode = initializeRoot();
@@ -2519,6 +2540,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 			// Check for end condition (57 recipes + the Chapter 5 intermission)
 			if(curNode->numOutputsCreated == NUM_RECIPES) {
 				NOISY_DEBUG("End condition\n");
+				const long oldIterationLimit = iterationLimit;
 				// All recipes have been fulfilled!
 				// Check that the total time taken is strictly less than the current observed record.
 				// Apply a frame penalty if the final move did not toss an item.
@@ -2526,11 +2548,13 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 
 				if (curNode->description.totalFramesTaken < getLocalRecord() + BUFFER_SEARCH_FRAMES) {
 					// A finished roadmap has been generated
+					// We are getting close enough to spend extra time on this branch.
+
 					// Rearrange the roadmap to save frames
 					struct OptimizeResult optimizeResult = optimizeRoadmap(root);
-					#pragma omp critical(optimize)
-					{
-						if (optimizeResult.last->description.totalFramesTaken < getLocalRecord()) {
+					if (optimizeResult.last->description.totalFramesTaken < getLocalRecord()) {
+						#pragma omp critical(optimize)
+						{
 							setLocalRecord(optimizeResult.last->description.totalFramesTaken);
 							char *filename = malloc(sizeof(char) * 17);
 							sprintf(filename, "results/%d.txt", optimizeResult.last->description.totalFramesTaken);
@@ -2544,27 +2568,65 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 							if (debug) {
 								testRecord(result_cache.frames);
 							}
-							result_cache = (struct Result){ optimizeResult.last->description.totalFramesTaken, rawID };
+						}
+						result_cache = (struct Result){ optimizeResult.last->description.totalFramesTaken, rawID };
 
-							const long oldIterationLimit = iterationLimit;
-							// Reset the iteration count so we continue to explore near this record
-							if (iterationLimit < ITERATION_LIMIT_MAX) {
-								if (iterationLimit == DEFAULT_ITERATION_LIMIT || iterationLimit == DEFAULT_ITERATION_LIMIT_SHORT) {
-									iterationLimit = iterationCount + ITERATION_LIMIT_INCREASE_FIRST;
-								} else {
-									iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX);
-								}
-								if (iterationLimit > ITERATION_LIMIT_MAX) {
-									iterationLimit = ITERATION_LIMIT_MAX;
-								}
+						// Reset the iteration count so we continue to explore near this record
+						if (ABSL_PREDICT_TRUE(iterationLimit < ITERATION_LIMIT_MAX)) {
+							if (!iterationLimitIncreasedFromPB) {
+								// On the first time with PB increase, use ITERATION_LIMIT_INCREASE_FIRST.
+								// If ITERATION_LIMIT_INCREASE_GETTING_CLOSE has already been applied, subtract that to get to ITERATION_LIMIT_INCREASE_FIRST.
+								iterationLimit = MAX(
+										iterationCount + ITERATION_LIMIT_INCREASE_FIRST - (
+												iterationLimitIncreasedFromGettingClose ? ITERATION_LIMIT_INCREASE_GETTING_CLOSE : 0),
+										iterationLimit + 2 * ITERATION_LIMIT_INCREASE_PAST_MAX);
 							} else {
-								iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE_PAST_MAX, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX/50);
+								iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX);
 							}
-							logIterationsAfterPB(displayID, stepIndex, curNode, optimizeResult.last->description.totalFramesTaken, iterationCount, oldIterationLimit, iterationLimit, 3);
+							if (ABSL_PREDICT_FALSE(iterationLimit > ITERATION_LIMIT_MAX)) {
+								iterationLimit = ITERATION_LIMIT_MAX;
+							}
+						} else {
+							iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE_PAST_MAX, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX/50);
+						}
+						if (iterationLimit > oldIterationLimit) {
+							iterationLimitIncreased = true;
+							iterationLimitIncreasedFromPB = true;
+						}
+						logIterationsAfterLimitIncrease(displayID, stepIndex, curNode, optimizeResult.last->description.totalFramesTaken, iterationCount, oldIterationLimit, iterationLimit, 3);
+					} else {
+						// Close enough to optimize but not to PB, still worth spending more time on the branch.
+						if (!iterationLimitIncreasedFromGettingClose && !iterationLimitIncreased && ABSL_PREDICT_TRUE(iterationLimit < ITERATION_LIMIT_MAX)) {
+							iterationLimit = MAX(
+									iterationCount + ITERATION_LIMIT_INCREASE_GETTING_CLOSE - (
+											iterationLimitIncreasedFromGettingKindOfClose ? ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE : 0),
+									iterationLimit + ITERATION_LIMIT_INCREASE_GETTING_CLOSE/50);
+							if (ABSL_PREDICT_FALSE(iterationLimit > ITERATION_LIMIT_MAX)) {
+								iterationLimit = ITERATION_LIMIT_MAX;
+							}
+							if (iterationLimit > oldIterationLimit) {
+								// Only log this once
+								logWithThreadInfo(displayID, "Close enough to PB to spend more time on this branch and optimize", 4);
+								logIterationsAfterLimitIncrease(displayID, stepIndex, curNode, optimizeResult.last->description.totalFramesTaken, iterationCount, oldIterationLimit, iterationLimit, 4);
+								iterationLimitIncreased = true;
+								iterationLimitIncreasedFromGettingClose = true;
+								iterationLimitIncreasedFromGettingKindOfClose = true;
+							}
 						}
 					}
-
 					freeAllNodes(optimizeResult.last);
+				} else if (curNode->description.totalFramesTaken < getLocalRecord() + BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE) {
+					if (!iterationLimitIncreased && !iterationLimitIncreasedFromGettingKindOfClose && ABSL_PREDICT_TRUE(iterationLimit < ITERATION_LIMIT_MAX)) {
+						iterationLimit = MAX(
+															iterationCount + ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE,
+															iterationLimit + ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE/50);
+						if (iterationLimit > oldIterationLimit) {
+							logWithThreadInfo(displayID, "Close enough to PB to spend more time on this branch", 4);
+							logIterationsAfterLimitIncrease(displayID, stepIndex, curNode, -1, iterationCount, oldIterationLimit, iterationLimit, 4);
+							iterationLimitIncreasedFromGettingKindOfClose = true;
+							// This is such a tiny increase we aren't even bothering to set iterationLimitIncreased.
+						}
+					}
 				}
 
 				// Regardless of record status, it's time to go back up and find new endstates
