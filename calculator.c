@@ -28,7 +28,7 @@
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
 #define BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE BUFFER_SEARCH_FRAMES + 150		// Threshold for closeness to the current record to try spending more time on the branch
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
-#define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
+#define DEFAULT_ITERATION_LIMIT 125000l // Cutoff for iterations explored before resetting
 #define DEFAULT_ITERATION_LIMIT_SHORT 65000l // Cutoff for iterations explored before resetting when short branches is randomly selected
 #define SHORT_ITERATION_LIMIT_CHANCE 40 // Chance (out of 100) for a thread to choose DEFAULT_ITERATION_LIMIT_SHORT instead of DEFAULT_ITERATION_LIMIT when starting a new branch
 #define ITERATION_LIMIT_INCREASE 5000000l // Amount to increase the iteration limit by when finding a new PB
@@ -44,7 +44,7 @@
 #define CAPACITY_DECREASE_THRESHOLD 0.25 // When a dynamically sized array element count is below this fraction of the capacity, shrink it
 #define CAPACITY_DECREASE_FACTOR 0.35 // When a dynamically sized array is shrunk, shrink it below this factor
 #define CAPACITY_DECREASE_FLOOR (2*DEFAULT_CAPACITY_FOR_EMPTY) // Never shrink a dynamically sized array below this capacity
-#define CHECK_SHUTDOWN_INTERVAL 1000
+#define CHECK_SHUTDOWN_INTERVAL 10000
 
 #define NEW_BRANCH_LOG_LEVEL 3
 
@@ -2534,6 +2534,10 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 			// exit out of the while loop to restart
 			if (curNode == NULL) {
 				NOISY_DEBUG("No current node. Breaking for next branch.\n");
+				if (iterationLimitIncreased) {
+					logWithThreadInfo(displayID, "No more legal moves at all: moving to next branch", 4);
+					logIterations(displayID, stepIndex, curNode, iterationCount, iterationLimit, 4);
+				}
 				break;
 			}
 
@@ -2553,6 +2557,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 					// Rearrange the roadmap to save frames
 					struct OptimizeResult optimizeResult = optimizeRoadmap(root);
 					if (optimizeResult.last->description.totalFramesTaken < getLocalRecord()) {
+						NOISY_DEBUG("New PB!\n");
 						#pragma omp critical(optimize)
 						{
 							setLocalRecord(optimizeResult.last->description.totalFramesTaken);
@@ -2594,7 +2599,8 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 							iterationLimitIncreasedFromPB = true;
 						}
 						logIterationsAfterLimitIncrease(displayID, stepIndex, curNode, optimizeResult.last->description.totalFramesTaken, iterationCount, oldIterationLimit, iterationLimit, 3);
-					} else {
+					} else {  // Close enough to optimizeRoadmap but not quite PB
+						NOISY_DEBUG("Not new PB but close\n");
 						// Close enough to optimize but not to PB, still worth spending more time on the branch.
 						if (!iterationLimitIncreasedFromGettingClose && !iterationLimitIncreased && ABSL_PREDICT_TRUE(iterationLimit < ITERATION_LIMIT_MAX)) {
 							iterationLimit = MAX(
@@ -2616,6 +2622,8 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 					}
 					freeAllNodes(optimizeResult.last);
 				} else if (curNode->description.totalFramesTaken < getLocalRecord() + BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE) {
+					// Close enough to look harder but not enough to put in the optimizeRoadmap overhead yet.
+					NOISY_DEBUG("Kind of close\n");
 					if (!iterationLimitIncreased && !iterationLimitIncreasedFromGettingKindOfClose && ABSL_PREDICT_TRUE(iterationLimit < ITERATION_LIMIT_MAX)) {
 						iterationLimit = MAX(
 															iterationCount + ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE,
