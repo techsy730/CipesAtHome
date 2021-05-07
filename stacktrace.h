@@ -1,8 +1,9 @@
 #ifndef STACKTRACE_H_
 #define STACKTRACE_H_
 
+#include <stdio.h>
 #include "absl/base/port.h"
-#include "base.h"
+#include "internal/base_essentials.h"
 
 #ifdef __cplusplus
 extern "C" {

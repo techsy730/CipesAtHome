@@ -6,9 +6,6 @@
 
 #ifndef CIPES_BASE_ESSENTIALS_H
 #define BASE_ESSENTIALS_H
-#ifndef CIPES_BASE_H
-#error This header file is only supposed to be included from base.h
-#endif
 
 #ifndef _STR
 #define _STR(x) #x
