@@ -26,18 +26,20 @@
 
 // User configurable tunables
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
-#define BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE BUFFER_SEARCH_FRAMES + 150		// Threshold for closeness to the current record to try spending more time on the branch
+#define BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE 3 * BUFFER_SEARCH_FRAMES // Threshold for closeness to the current record to try spending more time on the branch
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
-#define DEFAULT_ITERATION_LIMIT 125000l // Cutoff for iterations explored before resetting
-#define DEFAULT_ITERATION_LIMIT_SHORT 65000l // Cutoff for iterations explored before resetting when short branches is randomly selected
+#define DEFAULT_TERATION_LOG_BRANCH_INTERVAL_MAX_BEFORE_SLOWER_SCALING  50 // If the branch rate is above this, then additional values above this will be divided by DEFAULT_TERATION_LOG_BRANCH_RATE_DIVISOR for deciding when to log iteration progress incrementally.
+#define DEFAULT_TERATION_LOG_BRANCH_INTERVAL_DIVISOR  4 // How much to divide the branch rate additional value above the DEFAULT_TERATION_LOG_BRANCH_RATE_MAX_BEFORE_SLOWER_SCALING for deciding when to log iteration progress incrementally.
+#define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
+#define DEFAULT_ITERATION_LIMIT_SHORT 75000l // Cutoff for iterations explored before resetting when short branches is randomly selected
 #define SHORT_ITERATION_LIMIT_CHANCE 40 // Chance (out of 100) for a thread to choose DEFAULT_ITERATION_LIMIT_SHORT instead of DEFAULT_ITERATION_LIMIT when starting a new branch
-#define ITERATION_LIMIT_INCREASE 5000000l // Amount to increase the iteration limit by when finding a new PB
+#define ITERATION_LIMIT_INCREASE 100000000l // Amount to increase the iteration limit by when finding a new PB
 // Basically 2.5*ITERATION_LIMIT_INCREASE, but keeps floats out of it so we can static_assert on it
 #define ITERATION_LIMIT_INCREASE_FIRST ((ITERATION_LIMIT_INCREASE << 1) + (ITERATION_LIMIT_INCREASE >> 1)) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
-#define ITERATION_LIMIT_MAX (30*ITERATION_LIMIT_INCREASE) // Maxumum iteration limit before increases shrink drastically (a soft maximum)
+#define ITERATION_LIMIT_MAX (25*ITERATION_LIMIT_INCREASE) // Maxumum iteration limit before increases shrink drastically (a soft maximum)
 #define ITERATION_LIMIT_INCREASE_PAST_MAX (ITERATION_LIMIT_INCREASE/500) // Amount to increase the iteration limit by when finding a new record when past the max
-#define ITERATION_LIMIT_INCREASE_GETTING_CLOSE ITERATION_LIMIT_INCREASE / 4
-#define ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE ITERATION_LIMIT_INCREASE_GETTING_CLOSE / 4
+#define ITERATION_LIMIT_INCREASE_GETTING_CLOSE ITERATION_LIMIT_INCREASE_FIRST / 4
+#define ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE ITERATION_LIMIT_INCREASE_GETTING_CLOSE / 2
 #define SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE 25 // Chance (out of 100) for the select strategy to skip a seemingly good next move
 #define DEFAULT_CAPACITY_FOR_EMPTY 8 // When initializing a dynamically sized array, an empty/NULL array will be initialized to an Array of this size on a new element add
 #define CAPACITY_INCREASE_FACTOR 1.5 // When a dynamically sized array is full, increase capacity by this factor
@@ -50,7 +52,9 @@
 
 #define INDEX_ITEM_UNDEFINED -1
 
+// Sanity tests for constants.
 _CIPES_STATIC_ASSERT(VERBOSE_ITERATION_LOG_RATE > 0, "Log rates must be > 0");
+_CIPES_STATIC_ASSERT(BUFFER_SEARCH_FRAMES < BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE, "The 'close to PB' threshold must be <= 'kind of close to PB' threshold");
 _CIPES_STATIC_ASSERT(DEFAULT_ITERATION_LIMIT_SHORT <= DEFAULT_ITERATION_LIMIT, "Short iteration limit must be <= then default iteration limit");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE <= ITERATION_LIMIT_MAX, "Default iteration limit must be <= then iteration limit maximum");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
@@ -59,8 +63,11 @@ _CIPES_STATIC_ASSERT(SHORT_ITERATION_LIMIT_CHANCE >= 0, "Chance to use short ite
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_FIRST <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_PAST_MAX <= ITERATION_LIMIT_MAX, "Iteration limit increase must be <= then iteration limit maximum");
 _CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_PAST_MAX <= ITERATION_LIMIT_INCREASE, "The small Iteration limit (for when past ITERATION_LIMIT_MAX) must be <= the normal iteration limit increase");
-_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_GETTING_CLOSE <= ITERATION_LIMIT_INCREASE_FIRST, "The 'getting close' iteration limit increase must be less then the first PB increase.");
-_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_GETTING_CLOSE <= ITERATION_LIMIT_MAX, "The 'getting close' iteration limit increase must be <= then iteration limit maximum");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_GETTING_CLOSE <= ITERATION_LIMIT_INCREASE_FIRST, "The 'getting close to PB' iteration limit increase must be less then the first PB increase.");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_GETTING_CLOSE <= ITERATION_LIMIT_MAX, "The 'getting close to PB' iteration limit increase must be <= then iteration limit maximum");
+_CIPES_STATIC_ASSERT(ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE <= ITERATION_LIMIT_INCREASE_GETTING_CLOSE,
+		"The 'getting kind of close to PB' iteration limit increase must be <= The 'getting close to PB' iteration limit increase");
+
 _CIPES_STATIC_ASSERT(SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE < 100, "Chance to skip greedy, seemingly best move must be < 100");
 _CIPES_STATIC_ASSERT(SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE >= 0, "Chance to skip greedy, seemingly best move must be >= 0");
 _CIPES_STATIC_ASSERT(CHECK_SHUTDOWN_INTERVAL > 0, "Check for shutdown interval must be > 0");
@@ -2465,6 +2472,15 @@ static void logIterationsAfterLimitIncrease(int ID, int stepIndex, const struct 
 	}
 }
 
+static int iterationDefaultLogBranchValCompute(int branchInterval) {
+	return branchInterval <= DEFAULT_TERATION_LOG_BRANCH_INTERVAL_MAX_BEFORE_SLOWER_SCALING ? branchInterval :
+		DEFAULT_TERATION_LOG_BRANCH_INTERVAL_MAX_BEFORE_SLOWER_SCALING + ((branchInterval - DEFAULT_TERATION_LOG_BRANCH_INTERVAL_MAX_BEFORE_SLOWER_SCALING)/DEFAULT_TERATION_LOG_BRANCH_INTERVAL_DIVISOR);
+}
+
+static long iterationDefaultLogInterval(int branchInterval) {
+	return iterationDefaultLogBranchValCompute(branchInterval) * DEFAULT_ITERATION_LIMIT;
+}
+
 /*-------------------------------------------------------------------
  * Function 	: calculateOrder
  * Inputs	: int ID
@@ -2480,12 +2496,14 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 	// For debugging stacktraces
 	// _assert_with_stacktrace(false);
 	const int displayID = rawID + 1;
-	int randomise = getConfigInt("randomise");
-	int select = getConfigInt("select");
-	int debug = getConfigInt("debug");
+	const int randomise = getConfigInt("randomise");
+	const int select = getConfigInt("select");
+	const int debug = getConfigInt("debug");
 	// The user may disable all randomization but not be debugging.
 	int freeRunning = !debug && !randomise && !select;
-	int branchInterval = getConfigInt("branchLogInterval");
+	const int branchInterval = getConfigInt("branchLogInterval");
+	const int defaultIterationLogInterval = iterationDefaultLogInterval(branchInterval);
+	
 	long total_dives = 0;
 	struct BranchPath *curNode = NULL; // Deepest node at any particular point
 	struct BranchPath *root;
@@ -2580,11 +2598,16 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 						if (ABSL_PREDICT_TRUE(iterationLimit < ITERATION_LIMIT_MAX)) {
 							if (!iterationLimitIncreasedFromPB) {
 								// On the first time with PB increase, use ITERATION_LIMIT_INCREASE_FIRST.
-								// If ITERATION_LIMIT_INCREASE_GETTING_CLOSE has already been applied, subtract that to get to ITERATION_LIMIT_INCREASE_FIRST.
-								iterationLimit = MAX(
-										iterationCount + ITERATION_LIMIT_INCREASE_FIRST - (
-												iterationLimitIncreasedFromGettingClose ? ITERATION_LIMIT_INCREASE_GETTING_CLOSE : 0),
+								if (iterationLimitIncreasedFromGettingClose) {
+									iterationLimit = MAX(
+										// If ITERATION_LIMIT_INCREASE_GETTING_CLOSE has already been applied, subtract that to get to ITERATION_LIMIT_INCREASE_FIRST.
+										iterationLimit + ITERATION_LIMIT_INCREASE_FIRST - ITERATION_LIMIT_INCREASE_GETTING_CLOSE,
+										iterationCount + ITERATION_LIMIT_INCREASE_FIRST);
+								} else {
+									iterationLimit = MAX(
+										iterationCount + ITERATION_LIMIT_INCREASE_FIRST,
 										iterationLimit + 2 * ITERATION_LIMIT_INCREASE_PAST_MAX);
+								}
 							} else {
 								iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX);
 							}
@@ -2603,15 +2626,22 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 						NOISY_DEBUG("Not new PB but close\n");
 						// Close enough to optimize but not to PB, still worth spending more time on the branch.
 						if (!iterationLimitIncreasedFromGettingClose && !iterationLimitIncreased && ABSL_PREDICT_TRUE(iterationLimit < ITERATION_LIMIT_MAX)) {
-							iterationLimit = MAX(
-									iterationCount + ITERATION_LIMIT_INCREASE_GETTING_CLOSE - (
-											iterationLimitIncreasedFromGettingKindOfClose ? ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE : 0),
+							if (iterationLimitIncreasedFromGettingKindOfClose) {
+								iterationLimit = MAX(
+									// If ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE has already been applied, subtract that to get to ITERATION_LIMIT_INCREASE_GETTING_CLOSE.
+									iterationLimit + ITERATION_LIMIT_INCREASE_GETTING_CLOSE - ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE,
+									iterationCount + ITERATION_LIMIT_INCREASE_GETTING_CLOSE);
+							} else {
+								iterationLimit = MAX(
+									iterationCount + ITERATION_LIMIT_INCREASE_GETTING_CLOSE,
 									iterationLimit + ITERATION_LIMIT_INCREASE_GETTING_CLOSE/50);
+							}
 							if (ABSL_PREDICT_FALSE(iterationLimit > ITERATION_LIMIT_MAX)) {
 								iterationLimit = ITERATION_LIMIT_MAX;
 							}
 							if (iterationLimit > oldIterationLimit) {
 								// Only log this once
+								// TODO also log current PB and difference of current frame count and PB
 								logWithThreadInfo(displayID, "Close enough to PB to spend more time on this branch and optimize", 4);
 								logIterationsAfterLimitIncrease(displayID, stepIndex, curNode, optimizeResult.last->description.totalFramesTaken, iterationCount, oldIterationLimit, iterationLimit, 4);
 								iterationLimitIncreased = true;
@@ -2629,6 +2659,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 															iterationCount + ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE,
 															iterationLimit + ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE/50);
 						if (iterationLimit > oldIterationLimit) {
+							// TODO also log current PB and difference of current frame count and PB
 							logWithThreadInfo(displayID, "Close enough to PB to spend more time on this branch", 4);
 							logIterationsAfterLimitIncrease(displayID, stepIndex, curNode, -1, iterationCount, oldIterationLimit, iterationLimit, 4);
 							iterationLimitIncreasedFromGettingKindOfClose = true;
@@ -2776,11 +2807,11 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 
 				// Logging for progress display
 				iterationCount++;
-				if (iterationCount % (branchInterval * DEFAULT_ITERATION_LIMIT) == 0
+				if ((iterationCount % defaultIterationLogInterval) == 0
 					&& (freeRunning || iterationLimit != DEFAULT_ITERATION_LIMIT)) {
 					logIterations(displayID, stepIndex, curNode, iterationCount, iterationLimit, 3);
 				}
-				else if (iterationCount % VERBOSE_ITERATION_LOG_RATE == 0) {
+				else if ((iterationCount % VERBOSE_ITERATION_LOG_RATE) == 0) {
 					logIterations(displayID, stepIndex, curNode, iterationCount, iterationLimit, 6);
 				}
 			}
@@ -2828,6 +2859,11 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 						int localRecord = getLocalRecord();
 						if (ABSL_PREDICT_FALSE(localRecord < 0)) {
 							recipeLog(1, "Calculator", "Roadmap", "Error", "Current cached local record is corrupt (less then 0 frames). Not writing invalid PB file but your PB may be lost.");
+						} else if (ABSL_PREDICT_FALSE(localRecord > UNSET_FRAME_RECORD)) {
+							char reportStr[100];
+							sprintf(reportStr, "Current cached local record is corrupt (current [%d] greater then nonsense upper bound of [%d]). Not writing invalid PB file but your PB may be lost.",
+								localRecord, UNSET_FRAME_RECORD);
+							recipeLog(1, "Calculator", "Roadmap", "Error", reportStr);
 						} else {
 							fprintf(fp, "%d", localRecord);
 						}
