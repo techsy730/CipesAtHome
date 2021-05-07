@@ -46,11 +46,15 @@
 #define VA_OPT_SUPPORTED 0
 #endif
 
+
+// Will NOT work in top level, use _REQUIRE_SEMICOLON_TOP_LEVEL_OK for that
+#define _REQUIRE_SEMICOLON do {} while(0)
+
 // __cplusplus == 201103L means C++11
 #ifdef __cplusplus
 #if __cplusplus >= 201103L && !defined(__CDT_PARSER__)
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(DoNotUse)
-#define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(n) static_assert(true, "Never should see this error")
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(ignored) static_assert(true, "Never should see this error")
 #else
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(DoNotUse)
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(n) struct ABSL_ATTRIBUTE_UNUSED __##n
@@ -63,9 +67,6 @@
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_OK ABSL_ATTRIBUTE_UNUSED _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse)
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(n) ABSL_ATTRIBUTE_UNUSED static int __##n
 #endif
-
-// Will NOT work in top level, use _REQUIRE_SEMICOLON_TOP_LEVEL_OK for that
-#define _REQUIRE_SEMICOLON do {} while(0)
 
 
 // _MSC_VER 1910 is Visual Studio 2017
