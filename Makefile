@@ -63,7 +63,7 @@ GCC_ONLY_HIGH_OPT_CFLAGS?=
 # Trying to match x86-64-v2
 # as specified in https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
 # An intersection of -march=nehalem and -march=bdver1 (as of gcc-9) is the most consise way to express this (until gcc-11 and clang-12)
-SSE4_BUILD_CFLAGS?=-march=nehalem -mno-avx256-split-unaligned-load -mtune=generic
+SSE4_BUILD_CFLAGS?=-march=nehalem -mno-avx -mno-avx2 -mno-avx256-split-unaligned-load -mtune=generic
 # Trying to match x86-64-v3
 # as specified in https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
 # An intersection of -march=haswell and -march=bdver4 (as of gcc-9) is the most concise way to express this (until gcc-11 and clang-12)
