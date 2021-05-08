@@ -3,6 +3,11 @@
 #include <omp.h>
 #include <libconfig.h>
 #include "base.h"
+
+#ifndef _CIPES_IS_WINDOWS
+#error "base.h wasn't loaded correctly"
+#endif
+
 #include "inventory.h"
 #include "config.h"
 #include "recipes.h"
@@ -169,10 +174,10 @@ int main(int argc, char **argv) {
 		printf("Could not check version on Github. Please check your internet connection.\n");
 		printf("Otherwise, we can't submit completed roadmaps to the server!\n");
 		printf("Alternatively you may have been rate-limited. Please wait a while and try again.\n");
-#if _CIPES_IS_WINDOWS || _POSIX_C_SOURCE < 200112L
+#if _CIPES_IS_WINDOWS
 		printf("Will continue after %d seconds\n", WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS);
 		Sleep(WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS * 1000);
-#else
+#elif _POSIX_C_SOURCE >= 200112L
 		fd_set stdin;
 		FD_SET(STDERR_FILENO, &stdin);
 		printf("Press ENTER to continue (will automatically continue in %d seconds).\n", WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS);
@@ -184,6 +189,8 @@ int main(int argc, char **argv) {
 			printf("Failure in waiting! %d (%s)\n", errno, strerror(errno));
 			return retval;
 		}
+#else
+		printf("Continuing for now.\n");
 #endif
 	}
 	else if (update == 1) {

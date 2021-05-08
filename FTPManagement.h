@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "absl/base/port.h"
 
 ABSL_MUST_USE_RESULT_INCLUSIVE char *handle_get(char* url);

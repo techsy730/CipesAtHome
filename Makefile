@@ -6,34 +6,6 @@
 # Putting them after the make call (as arguments to make) causes make to IGNORE any changes we try to do.
 # We do a LOT of heavy post processing of these flags, and will cause things to break horrifically if not able to.
 
-WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds
-CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
-
-EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
-CFLAGS:=-I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
-DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DVERIFYING_SHIFTING_FUNCTIONS=1
-DEBUG_VERIFY_PROFILING_CFLAGS?=
-HIGH_OPT_CFLAGS?=-O3
-GCC_ONLY_HIGH_OPT_CFLAGS?=
-# Trying to match x86-64-v3
-# as specified in https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
-# An intersection of -march=haswell and -march=bdver4 (as of gcc-9) is the most concise way to express this (until gcc-11 and clang-12)
-AVX2_BUILD_CFLAGS?=-march=haswell -mno-hle -mtune=generic
-EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
-FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG -DFAST_BUT_NO_VERIFY=1
-GCC_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
-CLANG_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
-TARGET=recipesAtHome
-HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h $(wildcard absl/base/*.h)
-OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
-HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
-
-# Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
-DEPDIR?=.deps
-# gcc, clang, and icc all recognize this syntax
-GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
-
 # Recognized configurable variables: (any of the ones listed as "=1" don't actually default to 1, that is what you set it to enable the feature)
 # DEBUG=1 : Include debug symbols in the build and include stack traces (minimal to no impact on performance, just makes the binary bigger)
 # CFLAGS=... : Any additional CFLAGS to be used (are specified after built in CFLAGS)
@@ -67,7 +39,48 @@ GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 #   If set to false (whether explicit or automatically), when any header file change will trigger recompilation of all source files.
 # DEP_FLAGS
 #   Add these flags to the CFLAGS to generate dependency files.
-#   If unset, this will be automatically chosen based on the compiler used. 
+#   If unset, this will be automatically chosen based on the compiler used.
+# FOR_DISTRIBUTION=1
+#   If set, then build for external release (manually steps still needed to get the final archive)
+# DISTRIBUTION_DIR
+#   NOT IMPLEMENTED YET! will have the behavior below (OR may be abanonded if I switch to cmake or autoconf)
+#   If set, built artifacts will be put under a subdirectory (or absolute path if given) named this.
+#   If unset, then if FOR_DISTRIBUTION is set, this will be computed to a path based on the current target platform and architecture.
+#     Otherwise this remains blank (aka, build in the current directory)
+
+
+
+WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds
+CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
+
+EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
+CFLAGS:=-I . -O2 $(CFLAGS)
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
+DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DVERIFYING_SHIFTING_FUNCTIONS=1
+DEBUG_VERIFY_PROFILING_CFLAGS?=
+HIGH_OPT_CFLAGS?=-O3
+GCC_ONLY_HIGH_OPT_CFLAGS?=
+# Trying to match x86-64-v2
+# as specified in https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
+# An intersection of -march=nehalem and -march=bdver1 (as of gcc-9) is the most consise way to express this (until gcc-11 and clang-12)
+SSE4_BUILD_CFLAGS?=-march=nehalem -mno-avx -mno-avx2 -mno-avx256-split-unaligned-load -mtune=generic
+# Trying to match x86-64-v3
+# as specified in https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
+# An intersection of -march=haswell and -march=bdver4 (as of gcc-9) is the most concise way to express this (until gcc-11 and clang-12)
+AVX2_BUILD_CFLAGS?=-march=haswell -mno-hle -mtune=generic
+EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
+FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG -DFAST_BUT_NO_VERIFY=1
+GCC_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
+CLANG_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
+TARGET=recipesAtHome
+HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h $(wildcard absl/base/*.h)
+OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
+HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
+
+# Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
+DEPDIR?=.deps
+# gcc, clang, and icc all recognize this syntax
+GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 
 RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
 
@@ -130,8 +143,14 @@ endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(FOR_DISTRIBUTION)))
 	FOR_DISTRIBUTION=1
 endif
+# See https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
+# The base x86_64 arch supports CMOV, CMPXCHG8B, FPU, FXSR, MMX, FXSR, SCE, SSE, SSE2
+ifneq (,$(filter $(RECOGNIZED_TRUE), $(ASSUME_X86_64_V2)))
+	# Assume support for CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3 (close to Nehalem)
+	ASSUME_X86_64_V2=1
+endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(ASSUME_X86_64_V3)))
-	# See https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
+	# Assume support for AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE (close to Haswell)
 	ASSUME_X86_64_V3=1
 endif
 
@@ -199,14 +218,31 @@ ifeq (1,$(IS_WINDOWS))
 	EXTERNAL_LIBS+=-Iinclude_manually_provided -Llib_manually_provided/win
 endif
 ifeq (1,$(IS_WINDOWS_64))
-	ifeq (1 true,$(ASSUME_X86_64_V3) \
-	$(shell if [ -d lib_manually_provided/win64-avx2 -a -f lib_manually_provided/win64-avx2/libcurl.dll ]; then echo "true"; fi))
-		EXTERNAL_LIBS+=-Llib_manually_provided/win64-avx2
+	ifeq (1,$(ASSUME_X86_64_V2)
+		ifeq (,$(DISTRIBUTION_DIR))
+			DISTRIBUTION_DIR=win64-sse4
+		endif
+		ifeq (true, $(shell if [ -d lib_manually_provided/win64-sse4 -a -f lib_manually_provided/win64-sse4/libcurl.dll ]; then echo "true"; fi))
+			EXTERNAL_LIBS+=-Llib_manually_provided/win64-sse4
+		endif
+	else ifeq (1,$(ASSUME_X86_64_V3))
+		ifeq (,$(DISTRIBUTION_DIR))
+			DISTRIBUTION_DIR=win64-avx2
+		endif
+		ifeq (true,$(shell if [ -d lib_manually_provided/win64-avx2 -a -f lib_manually_provided/win64-avx2/libcurl.dll ]; then echo "true"; fi))
+			EXTERNAL_LIBS+=-Llib_manually_provided/win64-avx2
+		endif
 	else
+		ifeq (,$(DISTRIBUTION_DIR))
+			DISTRIBUTION_DIR=win64
+		endif
 		EXTERNAL_LIBS+=-Llib_manually_provided/win64
 	endif
 endif
 ifeq (1,$(IS_WINDOWS_32))
+	ifeq (,$(DISTRIBUTION_DIR))
+		DISTRIBUTION_DIR=win32
+	endif
 	EXTERNAL_LIBS+=-Llib_manually_provided/win32
 	# Format strings for size_t don't line up, and not really an easy way to fix it.
 	# Demote mismatching args to a warning
@@ -223,8 +259,13 @@ endif
 CFLAGS:=$(EXTERNAL_LIBS) $(CFLAGS)
 
 ifeq (1,$(FOR_DISTRIBUTION))
-ifeq (1,$(ASSUME_X86_64_V3))
+ifeq (1,$(ASSUME_X86_64_V2))
+	CFLAGS:=$(SSE4_BUILD_CFLAGS) $(CFLAGS)
+else ifeq (1,$(ASSUME_X86_64_V3))
 	CFLAGS:=$(AVX2_BUILD_CFLAGS) $(CFLAGS)
+endif
+ifeq (,$(DISTRIBUTION_DIR))
+	DISTRIBUTION_DIR=$(shell $(CC) $(CFLAGS) -dumpmachine) 
 endif
 endif
 
@@ -360,6 +401,13 @@ endif
 default: $(TARGET)
 
 all: default
+
+#ifneq (,$(DISTRIBUTION_DIR))
+#.ONESHELL:
+#	# Tell make to run this in one shell after running these commands
+#	@mkdir -p "$(DISTRIBUTION_DIR)"
+#	cd "$(DISTRIBUTION_DIR)"
+#endif
 
 .PHONY: clean clean_prof prof_clean make_dep_dir make_prof_dir prof_finish
 

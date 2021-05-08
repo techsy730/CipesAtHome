@@ -1,5 +1,6 @@
 #ifndef CALCULATOR_H
 #define CALCULATOR_H
+#include "base.h"
 #include <stdbool.h>
 #include "inventory.h"
 #include "recipes.h"
