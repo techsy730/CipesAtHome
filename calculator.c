@@ -2454,6 +2454,35 @@ static void logIterations(int ID, int stepIndex, const struct BranchPath * curNo
 	}
 }
 
+// destText is a pointer to a char array of size 50.
+static bool handleAfterOptimizing(char (*destText)[50], int afterOptimizingFrames) {
+	if (afterOptimizingFrames <= 0 || afterOptimizingFrames > UNSET_FRAME_RECORD) {
+		*destText[0] = 0;
+		return false;
+	} else {
+		sprintf(*destText, " (%d after optimizing)", afterOptimizingFrames);
+		return true;
+	}
+}
+
+static void logCloseToPb(int ID, size_t preambleTextLength, const char preambleText[preambleTextLength], const struct BranchPath * curNode, int pbFrames, int afterOptimizingFrames, int level) {
+	static const size_t outTextSize = 100;
+	_assert_with_stacktrace(preambleTextLength < 80);
+	char callString[30];
+	char outText[200];
+	char afterOptimizing[50];
+	sprintf(callString, "Thread %d", ID);
+	handleAfterOptimizing(&afterOptimizing, afterOptimizingFrames);
+	const int currentFrames = curNode->description.totalFramesTaken;
+	sprintf(outText, "%s: Current %d%s, PB: %d, difference %d",
+			preambleText,
+			currentFrames,
+			afterOptimizing,
+			pbFrames,
+			currentFrames - pbFrames);
+	recipeLog(level, "Calculator", "Info", callString, outText);
+}
+
 static void logIterationsAfterLimitIncrease(int ID, int stepIndex, const struct BranchPath * curNode, int afterOptimizingFrames, long iterationCount, long oldIterationLimit, long iterationLimit, int level)
 {
 	if (will_log_level(level)) {
@@ -2461,11 +2490,7 @@ static void logIterationsAfterLimitIncrease(int ID, int stepIndex, const struct 
 		char afterOptimizing[50];
 		char iterationString[300];
 		sprintf(callString, "Thread %d", ID);
-		if (afterOptimizingFrames < 0 || afterOptimizingFrames > UNSET_FRAME_RECORD) {
-			afterOptimizing[0] = 0;
-		} else {
-			sprintf(afterOptimizing, " (%d after optimizing)", afterOptimizingFrames);
-		}
+		handleAfterOptimizing(&afterOptimizing, afterOptimizingFrames);
 		sprintf(iterationString, "%d steps currently taken, %d%s; %ldk iterations (%ldk previous iteration max, %ldk new iteration max)",
 			stepIndex, curNode->description.totalFramesTaken, afterOptimizing, iterationCount / 1000, oldIterationLimit / 1000, iterationLimit / 1000);
 		recipeLog(level, "Calculator", "Info", callString, iterationString);
@@ -2503,7 +2528,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 	int freeRunning = !debug && !randomise && !select;
 	const int branchInterval = getConfigInt("branchLogInterval");
 	const int defaultIterationLogInterval = iterationDefaultLogInterval(branchInterval);
-	
+
 	long total_dives = 0;
 	struct BranchPath *curNode = NULL; // Deepest node at any particular point
 	struct BranchPath *root;
@@ -2640,10 +2665,11 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 								iterationLimit = ITERATION_LIMIT_MAX;
 							}
 							if (iterationLimit > oldIterationLimit) {
+								static const char closeAndOptimizePreamble[] = "Close enough to PB to spend more time on this branch and optimize";
 								// Only log this once
-								// TODO also log current PB and difference of current frame count and PB
-								logWithThreadInfo(displayID, "Close enough to PB to spend more time on this branch and optimize", 4);
-								logIterationsAfterLimitIncrease(displayID, stepIndex, curNode, optimizeResult.last->description.totalFramesTaken, iterationCount, oldIterationLimit, iterationLimit, 4);
+								int afterOptimizing = optimizeResult.last->description.totalFramesTaken;
+								logCloseToPb(displayID, sizeof(closeAndOptimizePreamble), closeAndOptimizePreamble, curNode, getLocalRecord(), afterOptimizing, 4);
+								logIterationsAfterLimitIncrease(displayID, stepIndex, curNode, afterOptimizing, iterationCount, oldIterationLimit, iterationLimit, 4);
 								iterationLimitIncreased = true;
 								iterationLimitIncreasedFromGettingClose = true;
 								iterationLimitIncreasedFromGettingKindOfClose = true;
@@ -2659,8 +2685,8 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 															iterationCount + ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE,
 															iterationLimit + ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE/50);
 						if (iterationLimit > oldIterationLimit) {
-							// TODO also log current PB and difference of current frame count and PB
-							logWithThreadInfo(displayID, "Close enough to PB to spend more time on this branch", 4);
+							static const char closePreamble[] = "Close enough to PB to spend more time on this branch";
+							logCloseToPb(displayID, sizeof(closePreamble), closePreamble, curNode, getLocalRecord(), 0, 4);
 							logIterationsAfterLimitIncrease(displayID, stepIndex, curNode, -1, iterationCount, oldIterationLimit, iterationLimit, 4);
 							iterationLimitIncreasedFromGettingKindOfClose = true;
 							// This is such a tiny increase we aren't even bothering to set iterationLimitIncreased.
