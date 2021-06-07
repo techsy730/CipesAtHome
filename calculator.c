@@ -2466,21 +2466,23 @@ static bool handleAfterOptimizing(char (*destText)[50], int afterOptimizingFrame
 }
 
 static void logCloseToPb(int ID, size_t preambleTextLength, const char preambleText[preambleTextLength], const struct BranchPath * curNode, int pbFrames, int afterOptimizingFrames, int level) {
-	static const size_t outTextSize = 100;
-	_assert_with_stacktrace(preambleTextLength < 80);
-	char callString[30];
-	char outText[200];
-	char afterOptimizing[50];
-	sprintf(callString, "Thread %d", ID);
-	handleAfterOptimizing(&afterOptimizing, afterOptimizingFrames);
-	const int currentFrames = curNode->description.totalFramesTaken;
-	sprintf(outText, "%s: Current %d%s, PB: %d, difference %d",
-			preambleText,
-			currentFrames,
-			afterOptimizing,
-			pbFrames,
-			currentFrames - pbFrames);
-	recipeLog(level, "Calculator", "Info", callString, outText);
+	if (will_log_level(level)) {
+		static const size_t outTextSize = 100;
+		_assert_with_stacktrace(preambleTextLength < 80);
+		char callString[30];
+		char outText[200];
+		char afterOptimizing[50];
+		sprintf(callString, "Thread %d", ID);
+		handleAfterOptimizing(&afterOptimizing, afterOptimizingFrames);
+		const int currentFrames = curNode->description.totalFramesTaken;
+		sprintf(outText, "%s: Current %d%s, PB: %d, difference %d",
+				preambleText,
+				currentFrames,
+				afterOptimizing,
+				pbFrames,
+				currentFrames - pbFrames);
+		recipeLog(level, "Calculator", "Info", callString, outText);
+	}
 }
 
 static void logIterationsAfterLimitIncrease(int ID, int stepIndex, const struct BranchPath * curNode, int afterOptimizingFrames, long iterationCount, long oldIterationLimit, long iterationLimit, int level)
