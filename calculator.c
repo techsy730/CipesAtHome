@@ -25,6 +25,9 @@
 #define JUMP_STORAGE_NO_TOSS_FRAMES 5		// Penalty for not tossing the last item (because we need to get Jump Storage)
 
 // User configurable tunables
+#define WEAK_PB_FLOOR 4500		// If PB is above this value, consider it a "weak" PB and don't increase iteration limit as much.
+// Just so first runs (like from non-existant results dir) don't spend so long trying to "optimize" a "not all that great" branch.
+#define WEAK_PB_FLOOR_DIVISIOR 30 	// Divide limit increase by this if a "weak" PB.
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
 #define BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE 3 * BUFFER_SEARCH_FRAMES // Threshold for closeness to the current record to try spending more time on the branch
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
@@ -2508,6 +2511,11 @@ static long iterationDefaultLogInterval(int branchInterval) {
 	return iterationDefaultLogBranchValCompute(branchInterval) * DEFAULT_ITERATION_LIMIT;
 }
 
+ABSL_ATTRIBUTE_ALWAYS_INLINE static int getLimitIncreaseDivisor(int currentPb) {
+	// After the flurry of it being true in the beginning, this will almost always be false once PB gets to a somewhat optimized level.
+	return ABSL_PREDICT_FALSE(currentPb >= WEAK_PB_FLOOR) ? WEAK_PB_FLOOR_DIVISIOR : 1;
+}
+
 /*-------------------------------------------------------------------
  * Function 	: calculateOrder
  * Inputs	: int ID
@@ -2595,7 +2603,10 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 				// Apply a frame penalty if the final move did not toss an item.
 				applyJumpStorageFramePenalty(curNode);
 
-				if (curNode->description.totalFramesTaken < getLocalRecord() + BUFFER_SEARCH_FRAMES) {
+				const int currentPb = curNode->description.totalFramesTaken;
+				const int limitIncreaseDivisor = getLimitIncreaseDivisor(currentPb);
+
+				if (currentPb < getLocalRecord() + BUFFER_SEARCH_FRAMES) {
 					// A finished roadmap has been generated
 					// We are getting close enough to spend extra time on this branch.
 
@@ -2628,21 +2639,21 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 								if (iterationLimitIncreasedFromGettingClose) {
 									iterationLimit = MAX(
 										// If ITERATION_LIMIT_INCREASE_GETTING_CLOSE has already been applied, subtract that to get to ITERATION_LIMIT_INCREASE_FIRST.
-										iterationLimit + ITERATION_LIMIT_INCREASE_FIRST - ITERATION_LIMIT_INCREASE_GETTING_CLOSE,
-										iterationCount + ITERATION_LIMIT_INCREASE_FIRST);
+										iterationLimit + (ITERATION_LIMIT_INCREASE_FIRST/limitIncreaseDivisor) - ITERATION_LIMIT_INCREASE_GETTING_CLOSE,
+										iterationCount + (ITERATION_LIMIT_INCREASE_FIRST/limitIncreaseDivisor));
 								} else {
 									iterationLimit = MAX(
-										iterationCount + ITERATION_LIMIT_INCREASE_FIRST,
+										iterationCount + (ITERATION_LIMIT_INCREASE_FIRST/limitIncreaseDivisor),
 										iterationLimit + 2 * ITERATION_LIMIT_INCREASE_PAST_MAX);
 								}
 							} else {
-								iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX);
+								iterationLimit = MAX(iterationCount + (ITERATION_LIMIT_INCREASE/limitIncreaseDivisor), iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX);
 							}
 							if (ABSL_PREDICT_FALSE(iterationLimit > ITERATION_LIMIT_MAX)) {
 								iterationLimit = ITERATION_LIMIT_MAX;
 							}
 						} else {
-							iterationLimit = MAX(iterationCount + ITERATION_LIMIT_INCREASE_PAST_MAX, iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX/50);
+							iterationLimit = MAX(iterationCount + (ITERATION_LIMIT_INCREASE_PAST_MAX/limitIncreaseDivisor), iterationLimit + ITERATION_LIMIT_INCREASE_PAST_MAX/50);
 						}
 						if (iterationLimit > oldIterationLimit) {
 							iterationLimitIncreased = true;
@@ -2656,11 +2667,11 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 							if (iterationLimitIncreasedFromGettingKindOfClose) {
 								iterationLimit = MAX(
 									// If ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE has already been applied, subtract that to get to ITERATION_LIMIT_INCREASE_GETTING_CLOSE.
-									iterationLimit + ITERATION_LIMIT_INCREASE_GETTING_CLOSE - ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE,
-									iterationCount + ITERATION_LIMIT_INCREASE_GETTING_CLOSE);
+									iterationLimit + (ITERATION_LIMIT_INCREASE_GETTING_CLOSE/limitIncreaseDivisor) - ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE,
+									iterationCount + (ITERATION_LIMIT_INCREASE_GETTING_CLOSE/limitIncreaseDivisor));
 							} else {
 								iterationLimit = MAX(
-									iterationCount + ITERATION_LIMIT_INCREASE_GETTING_CLOSE,
+									iterationCount + ITERATION_LIMIT_INCREASE_GETTING_CLOSE/limitIncreaseDivisor,
 									iterationLimit + ITERATION_LIMIT_INCREASE_GETTING_CLOSE/50);
 							}
 							if (ABSL_PREDICT_FALSE(iterationLimit > ITERATION_LIMIT_MAX)) {
@@ -2684,7 +2695,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 					NOISY_DEBUG("Kind of close\n");
 					if (!iterationLimitIncreased && !iterationLimitIncreasedFromGettingKindOfClose && ABSL_PREDICT_TRUE(iterationLimit < ITERATION_LIMIT_MAX)) {
 						iterationLimit = MAX(
-															iterationCount + ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE,
+															iterationCount + (ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE/limitIncreaseDivisor),
 															iterationLimit + ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE/50);
 						if (iterationLimit > oldIterationLimit) {
 							static const char closePreamble[] = "Close enough to PB to spend more time on this branch";
