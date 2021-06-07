@@ -41,7 +41,7 @@
 #   Add these flags to the CFLAGS to generate dependency files.
 #   If unset, this will be automatically chosen based on the compiler used.
 # FOR_DISTRIBUTION=1
-#   If set, then build for external release (manually steps still needed to get the final archive)
+#   If set, then build for external release (manual steps still needed to get the final archive)
 # DISTRIBUTION_DIR
 #   NOT IMPLEMENTED YET! will have the behavior below (OR may be abanonded if I switch to cmake or autoconf)
 #   If set, built artifacts will be put under a subdirectory (or absolute path if given) named this.
