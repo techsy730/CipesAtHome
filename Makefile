@@ -63,10 +63,12 @@ GCC_ONLY_HIGH_OPT_CFLAGS?=
 # Trying to match x86-64-v2
 # as specified in https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
 # An intersection of -march=nehalem and -march=bdver1 (as of gcc-9) is the most consise way to express this (until gcc-11 and clang-12)
+# Assume support for CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3 (close to Nehalem)
 SSE4_BUILD_CFLAGS?=-march=nehalem -mno-avx -mno-avx2 -mno-avx256-split-unaligned-load -mtune=generic
 # Trying to match x86-64-v3
 # as specified in https://www.phoronix.com/scan.php?page=news_item&px=GCC-11-x86-64-Feature-Levels
 # An intersection of -march=haswell and -march=bdver4 (as of gcc-9) is the most concise way to express this (until gcc-11 and clang-12)
+# Assume support for AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE (close to Haswell)
 AVX2_BUILD_CFLAGS?=-march=haswell -mno-hle -mtune=generic
 EXPERIMENTAL_OPT_CFLAGS?=-DENABLE_PREFETCHING=1
 FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG -DFAST_BUT_NO_VERIFY=1
