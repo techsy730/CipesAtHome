@@ -49,7 +49,7 @@
 #define CAPACITY_DECREASE_THRESHOLD 0.25 // When a dynamically sized array element count is below this fraction of the capacity, shrink it
 #define CAPACITY_DECREASE_FACTOR 0.35 // When a dynamically sized array is shrunk, shrink it below this factor
 #define CAPACITY_DECREASE_FLOOR (2*DEFAULT_CAPACITY_FOR_EMPTY) // Never shrink a dynamically sized array below this capacity
-#define CHECK_SHUTDOWN_INTERVAL 10000
+#define CHECK_SHUTDOWN_INTERVAL 30000
 
 #define NEW_BRANCH_LOG_LEVEL 3
 
