@@ -1581,6 +1581,7 @@ struct OptimizeResult optimizeRoadmap(const struct BranchPath *root) {
  * is a newer version, alert the user.
  -------------------------------------------------------------------*/
 void periodicGithubCheck() {
+#if 0  // Disabled for profiling
 	// Double check the latest release on Github
 	int update = checkForUpdates(getLocalVersion());
 	if (update == -1) {
@@ -1593,6 +1594,7 @@ void periodicGithubCheck() {
 		ABSL_ATTRIBUTE_UNUSED char exitChar = getchar();
 		exit(1);
 	}
+#endif
 }
 
 /*-------------------------------------------------------------------
@@ -2583,6 +2585,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 			if (checkShutdownOnIndexLong(iterationCount)) {
 				break;
 			}
+			++totalIterations[rawID];
 			// In the rare occassion that the root node runs out of legal moves due to "select",
 			// exit out of the while loop to restart
 			if (curNode == NULL) {

@@ -163,11 +163,15 @@ int main(int argc, char **argv) {
 	// Create workerCount threads
 	omp_set_num_threads(workerCount);
 
+	totalIterations = calloc(workerCount, sizeof(long));
+
 	prepareStackTraces();
 
 	local_ver = getConfigStr("Version");
 	init_level_cfg();
 	curl_global_init(CURL_GLOBAL_DEFAULT);	// Initialize libcurl
+
+#if 0  // Disabled for profiling
 	int update = checkForUpdates(local_ver);
 
 	if (update == -1) {
@@ -199,6 +203,7 @@ int main(int argc, char **argv) {
 		char exitChar = getchar();
 		return -1;
 	}
+#endif
 
 	// Verify that username field is not malformed,
 	// as this would cause errors when a roadmap is submitted to the servers
@@ -276,7 +281,9 @@ int main(int argc, char **argv) {
 		}
 
 		// Seed each thread's PRNG for the select and randomise config options
-		srand(((int)time(NULL)) ^ rawID);
+		// srand(((int)time(NULL)) ^ rawID);
+		// DO NOT PUSH only for profiling
+		srand(rawID);
 
 		while (max_outer_loops_fixed < 0 || cycle_count < max_outer_loops_fixed) {
 			if (askedToShutdown()) {
@@ -285,16 +292,28 @@ int main(int argc, char **argv) {
 			++cycle_count;
 			struct Result result = calculateOrder(rawID, max_branches_fixed);
 
+#if 0  // Disabled for profiling
 			// result might store -1 frames for errors that might be recoverable
 			if (result.frames > -1) {
 				testRecord(result.frames);
 			}
+#endif
 		}
 #pragma omp critical(printing_on_failure)
 		{
 			printf("[Thread %d/%d][Done]\n", displayID, workerCount);
 		}
 	}
+
+	// Statistics for profiling
+	long sum = 0;
+	for (int i = 0; i < workerCount; ++i) {
+		printf("Thread %i iterations: %li\n", i, totalIterations[i]);
+		sum += totalIterations[i];
+	}
+	printf("Total iterations: %li\n", sum);
+	free(totalIterations);
+	totalIterations = NULL;
 
 	return 0;
 }

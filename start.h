@@ -14,6 +14,8 @@ struct Result {
 
 #define UNSET_FRAME_RECORD 9999
 
+long* totalIterations;
+
 // May get a value <0 if local record was corrupt.
 int getLocalRecord();
 void setLocalRecord(int frames);
