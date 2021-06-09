@@ -11,6 +11,8 @@ struct Result {
 	int callNumber;
 };
 
+long* totalIterations;
+
 int getLocalRecord();
 void setLocalRecord(int frames);
 const char* getLocalVersion();

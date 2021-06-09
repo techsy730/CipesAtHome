@@ -29,8 +29,17 @@ const char *getLocalVersion() {
 	return local_ver;
 }
 
-int main() {
-	int cycle_count = 1;
+int main(int argc, char **argv) {
+
+	int max_outer_loops = -1;
+	long max_branches = -1;
+	if (argc >= 2) {
+		max_branches = atol(argv[1]);
+		if (argc >= 3) {
+			max_outer_loops = atoi(argv[2]);
+		}
+	}
+
 	current_frame_record = 9999;
 	initConfig();
 
@@ -38,11 +47,19 @@ int main() {
 	// The debug setting can only be meaningfully used with one thread as well.
 	int workerCount = (getConfigInt("select") || getConfigInt("randomise"))
 					  && !getConfigInt("debug") ? getConfigInt("workerCount") : 1;
+
+	// Create workerCount threads
+	omp_set_num_threads(workerCount);
+
+	totalIterations = calloc(workerCount, sizeof(long));
+
 	local_ver = getConfigStr("Version");
 	init_level_cfg();
 	curl_global_init(CURL_GLOBAL_DEFAULT);	// Initialize libcurl
+
+#if 0  // Disabled for profiling
 	int update = checkForUpdates(local_ver);
-	
+
 	// Greeting message to user
 	printf("Welcome to Recipes@Home!\n");
 	printf("Leave this program running as long as you want to search for new recipe orders.\n");
@@ -54,7 +71,7 @@ int main() {
 	else {
 		printf("The current fastest record is %d frames. Happy cooking!\n", blob_record);
 	}
-	
+
 	if (update == -1) {
 		printf("Could not check version on Github. Please check your internet connection.\n");
 		printf("Otherwise, we can't submit completed roadmaps to the server!\n");
@@ -69,6 +86,7 @@ int main() {
 		char exitChar = getchar();
 		return -1;
 	}
+#endif
 
 	// Verify that username field is not malformed,
 	// as this would cause errors when a roadmap is submitted to the servers
@@ -104,25 +122,45 @@ int main() {
 	// persist through all parallel calls to calculator.c
 	initializeInvFrames();
 	initializeRecipeList();
-	
+
+	// copying to const so OpenMP knows it doesn't have to have each thread
+	// recheck this.
+	const int max_outer_loops_fixed = max_outer_loops;
+	const long max_branches_fixed = max_branches;
+
 	// Create workerCount threads
-	omp_set_num_threads(workerCount);
 	#pragma omp parallel
 	{
+		int cycle_count = 0;
 		int ID = omp_get_thread_num();
-		
+
 		// Seed each thread's PRNG for the select and randomise config options
-		srand(((int)time(NULL)) ^ ID);
-		
-		while (1) {
-			struct Result result = calculateOrder(ID);
-			
+		// srand(((int)time(NULL)) ^ rawID);
+		// DO NOT PUSH only for profiling
+		srand(ID);
+
+		while (max_outer_loops_fixed < 0 || cycle_count < max_outer_loops_fixed) {
+			++cycle_count;
+			struct Result result = calculateOrder(ID, max_branches_fixed);
+
+#if 0  // Disabled for profiling
 			// result might store -1 frames for errors that might be recoverable
 			if (result.frames > -1) {
 				testRecord(result.frames);
 			}
+#endif
 		}
 	}
-	
+
+	// Statistics for profiling
+	long sum = 0;
+	for (int i = 0; i < workerCount; ++i) {
+		printf("Thread %i iterations: %li\n", i, totalIterations[i]);
+		sum += totalIterations[i];
+	}
+	printf("Total iterations: %li\n", sum);
+	free(totalIterations);
+	totalIterations = NULL;
+
 	return 0;
 }
