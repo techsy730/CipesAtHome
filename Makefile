@@ -82,7 +82,9 @@ HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculato
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 CXX_OBJS=
-CXX_HIGH_PERF_OBJS=random_adapter.o
+CXX_HIGH_PERF_OBJS=
+# Those that import the Xoshiro header
+XOSHIRO_CXX_USAGE=random_adapter.o
 
 # Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 DEPDIR?=.deps
@@ -480,11 +482,8 @@ prof_finish:
 ifeq ($(PERFORMANCE_PROFILING),1)
 XOSHIRO_CXXFLAGS?=-fno-move-loop-invariants and -fno-unroll-loops
 endif
-ifeq ($(USE_DEPENDENCY_FILES),1)
-RANDOM_ADAPTER_DEP=$(DEPDIR)/random_adapter.dep
-endif
 
-random_adapter.o: random_adapter.cpp $(RANDOM_ADAPTER_DEP) | prof_finish make_dep_dir
+$(XOSHIRO_CXX_USAGE): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
 	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) $(HIGH_OPT_CFLAGS) $(XOSHIRO_CXXFLAGS) -c -o $@ $<
 
 $(CXX_HIGH_PERF_OBJS): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
@@ -502,7 +501,7 @@ $(CXX_OBJS): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
 #%.o: %.cc $(DEPS) | prof_finish make_dep_dir
 #	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) -c -o $@ $<
 
-$(TARGET): $(OBJ) $(CXX_OBJS) $(HIGH_PERF_OBJS) $(CXX_HIGH_PERF_OBJS) | make_prof_dir prof_finish
+$(TARGET): $(OBJ) $(CXX_OBJS) $(HIGH_PERF_OBJS) $(CXX_HIGH_PERF_OBJS) $(XOSHIRO_CXX_USAGE) | make_prof_dir prof_finish
 	$(CC) $(CFLAGS_ALL) $(HIGH_OPT_CFLAGS) $(FINAL_TARGET_CFLAGS) -o $@ $^ $(FINAL_STATIC_LINKS)
 
 ifeq (,$(DEPDIR))
