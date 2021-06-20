@@ -6,19 +6,6 @@
 # Putting them after the make call (as arguments to make) causes make to IGNORE any changes we try to do.
 # We do a LOT of heavy post processing of these flags, and will cause things to break horrifically if not able to.
 
-CFLAGS:=-lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
-HIGH_OPT_CFLAGS?=-O3
-TARGET=recipesAtHome
-HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h $(wildcard absl/base/*.h)
-OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o
-HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
-
-# Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
-DEPDIR?=.deps
-# gcc, clang, and icc all recognize this syntax
-GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
-
 # Recognized configurable variables:
 # DEBUG=1 Include debug symbols in the build and include stack traces (minimal to no impact on performance, just makes the binary bigger)
 # CFLAGS=... : Any additional CFLAGS to be used (are specified after built in CFLAGS)
@@ -41,7 +28,20 @@ GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 #   If set to false (whether explicit or automatically), when any header file change will trigger recompilation of all source files.
 # DEP_FLAGS
 #   Add these flags to the CFLAGS to generate dependency files.
-#   If unset, this will be automatically chosen based on the compiler used. 
+#   If unset, this will be automatically chosen based on the compiler used.
+
+CFLAGS:=-lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
+HIGH_OPT_CFLAGS?=-O3
+TARGET=recipesAtHome
+HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h $(wildcard absl/base/*.h)
+OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o
+HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
+
+# Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
+DEPDIR?=.deps
+# gcc, clang, and icc all recognize this syntax
+GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d 
 
 RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
 
