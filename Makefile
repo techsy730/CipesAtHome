@@ -50,11 +50,14 @@
 
 
 
-WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds
+WARNINGS_AND_ERRORS?=-Wall -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds
+WARNINGS_AND_ERRORS_CC?=-Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers
+WARNINGS_AND_ERRORS_CXX?=
 FINAL_TARGET_CFLAGS=-Wl,--gc-sections
 CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
 EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
 CFLAGS_BASE:=-I .
+CXXFLAGS_BASE:=-std=c++17
 CFLAGS_PROF:=
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
 DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DVERIFYING_SHIFTING_FUNCTIONS=1
@@ -78,6 +81,8 @@ TARGET=recipesAtHome
 HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h $(wildcard absl/base/*.h)
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
+CXX_OBJS=
+CXX_HIGH_PERF_OBJS=
 
 # Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 DEPDIR?=.deps
@@ -102,6 +107,19 @@ endif
 IS_CC_EMPTY=0
 ifeq ($(CC),)
 	IS_CC_EMPTY=1
+endif
+
+IS_CXX_EXACTLY_CPP=0
+ifeq ($(CXX),cpp)
+	IS_CXX_EXACTLY_CPP=1
+endif
+IS_CXX_EMPTY=0
+ifeq ($(CXX),)
+	IS_CXX_EMPTY=1
+endif
+
+ifeq ($(IS_CC_EMPTY) $(IS_CXX_EMPTY), 0 1)
+	$(error Cannot specify CXX without also specifying CC)
 endif
 
 DEBUG_EXPLICIT=0
@@ -171,6 +189,20 @@ ifneq ($(IS_CC_EXACTLY_CC) $(IS_CC_EMPTY), 0 0)
 		CC:=$(MACPREFIX)/opt/llvm/bin/clang
 		CFLAGS_BASE+=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib
 	endif
+endif
+ifneq ($(IS_CXX_EXACTLY_CPP) $(IS_CXX_EMPTY) $(IS_CC_EMPTY), 0 0 0)
+	ifeq ($(UNAME), Linux)
+		CXX=g++
+	endif
+	ifeq ($(UNAME), Darwin)
+		MACPREFIX:=$(shell brew --prefix)
+		CXX:=$(MACPREFIX)/opt/llvm/bin/clang++
+	endif
+endif
+
+ifeq (,$(CXX))
+	# CC set but not CXX. Assume CXX is CC, because usually a C compiler can tell if a file is C++ and switch to C++ compiling mode.
+	CXX=$(CC)
 endif
 
 _64_BIT_MINGW=x86_64-w64-mingw
@@ -380,6 +412,11 @@ else
 endif
 
 CFLAGS_ALL:=$(CFLAGS_BASE) $(CFLAGS_OPT) $(CFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CC)
+ifeq (,$(CXX_FLAGS))
+	CXX_FLAGS:=$(CFLAGS)
+endif
+CXXFLAGS_ALL:=$(CFLAGS_BASE) $(CXXFLAGS_BASE) $(CFLAGS_OPT) $(CXXFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CXX)
+
 ifeq (1,$(DEBUG))
 	ifeq (1,$(DEBUG_VERIFY_PROFILING))
 		ifeq (gcc 0,$(COMPILER) $(USE_GOOGLE_PERFTOOLS))
@@ -397,6 +434,7 @@ ifeq (1,$(DEBUG))
 		DEBUG_CFLAGS:=$(filter-out -rdynamic,$(DEBUG_CFLAGS))
 	endif
 	CFLAGS_ALL+=$(DEBUG_CFLAGS)
+	CXXFLAGS_ALL+=$(DEBUG_CFLAGS)
 	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
 endif
 
@@ -436,14 +474,25 @@ prof_finish:
 
 # Delete the default c compile rules
 %.o : %.c
+%.o : %.cpp
+%.o : %.cc
+
+$(CXX_HIGH_PERF_OBJS): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
+	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) $(HIGH_OPT_CFLAGS) -c -o $@ $<
 
 $(HIGH_PERF_OBJS): %.o: %.c $(DEPS) | prof_finish make_dep_dir
 	$(CC) $(DEP_FLAGS) $(CFLAGS_ALL) $(HIGH_OPT_CFLAGS) -c -o $@ $<
 
+$(CXX_OBJS): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
+	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) -c -o $@ $<
+
 %.o: %.c $(DEPS) | prof_finish make_dep_dir
 	$(CC) $(DEP_FLAGS) $(CFLAGS_ALL) -c -o $@ $<
 
-$(TARGET): $(OBJ) $(HIGH_PERF_OBJS) | make_prof_dir prof_finish
+#%.o: %.cc $(DEPS) | prof_finish make_dep_dir
+#	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) -c -o $@ $<
+
+$(TARGET): $(OBJ) $(CXX_OBJS) $(HIGH_PERF_OBJS) $(CXX_HIGH_PERF_OBJS) | make_prof_dir prof_finish
 	$(CC) $(CFLAGS_ALL) $(HIGH_OPT_CFLAGS) $(FINAL_TARGET_CFLAGS) -o $@ $^ $(FINAL_STATIC_LINKS)
 
 ifeq (,$(DEPDIR))
@@ -452,6 +501,7 @@ else
 _DEPDIR_LOCATION=$(DEPDIR)
 endif
 DEPFILES:=$(patsubst %.c,$(_DEPDIR_LOCATION)/%.dep,$(wildcard *.c))
+DEPFILES+=$(patsubst %.cpp,$(_DEPDIR_LOCATION)/%.dep,$(wildcard *.cpp))
 
 # Have make ignore uncreated dep files if not generated yet
 # If they are generated, the include $(wildcard $(DEPFILES)) will overwrite these rules.
