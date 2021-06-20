@@ -33,7 +33,7 @@
 #     google-perftools, libgoogle-perftools-dev
 # USE_DEPENDENCY_FILES=1
 #   Use the dependency file generation logic to only include headers needed by every C file to trigger a recompilation.
-#   This requires generating Makefile snippet .d files under DEPDIR
+#   This requires generating Makefile snippet .dep files under DEPDIR
 #   Adds DEPFLAGS to the CFLAGS if true
 #   If unset (or empty), this will be automatically chosen based on the compiler used.
 #   If set to false (whether explicit or automatically), when any header file change will trigger recompilation of all source files.
@@ -82,7 +82,7 @@ HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 # Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 DEPDIR?=.deps
 # gcc, clang, and icc all recognize this syntax
-GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
+GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.dep
 
 RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
 
@@ -317,7 +317,7 @@ ifeq (1,$(USE_DEPENDENCY_FILES))
 	ifeq (,$(DEP_FLAGS))
 		$(warning DEP_FLAGS is empty, but USE_DEPENDENCY_FILES=1; this will probably fail)
 	endif
-	DEPS:=$(DEPDIR)/%.d
+	DEPS:=$(DEPDIR)/%.dep
 	ifeq (,$(DEPDIR))
 		MAKE_DEPDIR_COMMAND:=
 	else ifeq (.,$(DEPDIR))
@@ -451,7 +451,7 @@ _DEPDIR_LOCATION=.
 else
 _DEPDIR_LOCATION=$(DEPDIR)
 endif
-DEPFILES:=$(patsubst %.c,$(_DEPDIR_LOCATION)/%.d,$(wildcard *.c))
+DEPFILES:=$(patsubst %.c,$(_DEPDIR_LOCATION)/%.dep,$(wildcard *.c))
 
 # Have make ignore uncreated dep files if not generated yet
 # If they are generated, the include $(wildcard $(DEPFILES)) will overwrite these rules.
@@ -460,8 +460,8 @@ $(DEPFILES):
 clean:
 	$(RM) ./*.o
 	$(RM) ./$(TARGET) ./$(TARGET).exe
-	$(RM) ./*.d
-	$(RM) ./$(DEPDIR)/*.d
+	$(RM) ./*.dep
+	$(RM) ./$(DEPDIR)/*.dep
 
 _DO_REDUCED_CLEAN_PROF=0
 ifeq (,$(PROF_DIR))

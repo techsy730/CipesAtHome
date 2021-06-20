@@ -8,7 +8,7 @@ recipes.log
 *.ipch
 *.db
 *.o
-*.d
+*.dep
 *.gcda
 *.gcno
 *.profraw
