@@ -30,8 +30,12 @@
 #   Add these flags to the CFLAGS to generate dependency files.
 #   If unset, this will be automatically chosen based on the compiler used.
 
-CFLAGS:=-lcurl -lconfig -fopenmp -Wall -Werror=implicit-function-declaration -I . -O2 $(CFLAGS)
+WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration
+EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
+CFLAGS_BASE:=-I .
+CFLAGS_PROF:=
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
+CFLAGS_OPT:=-O2
 HIGH_OPT_CFLAGS?=-O3
 TARGET=recipesAtHome
 HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h $(wildcard absl/base/*.h)
@@ -98,7 +102,7 @@ ifneq ($(IS_CC_EXACTLY_CC) $(IS_CC_EMPTY), 0 0)
 	ifeq ($(UNAME), Darwin)
 		MACPREFIX:=$(shell brew --prefix)
 		CC:=$(MACPREFIX)/opt/llvm/bin/clang
-		CFLAGS+=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib $(CFLAGS)
+		CFLAGS_BASE+=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib
 	endif
 endif
 
@@ -150,9 +154,9 @@ endif
 ifeq (1,$(USE_LTO))
 	DEBUG_CFLAGS+=-ffat-lto-objects
 	ifeq (gcc,$(COMPILER))
-		CFLAGS+=-flto=jobserver -fuse-ld=gold
+		CFLAGS_OPT+=-fuse-ld=gold -flto=jobserver
 	else
-		CFLAGS+=-flto
+		CFLAGS_OPT+=-flto
 	endif
 endif
 
@@ -163,12 +167,12 @@ endif
 ifeq (1,$(PROFILE_GENERATE))
 	DEBUG?=1
 	ifeq (clang,$(COMPILER))
-		CFLAGS+=-fcs-profile-generate=$(PROF_DIR)
+		CFLAGS_PROF+=-fcs-profile-generate=$(PROF_DIR)
 	else ifeq (gcc,$(COMPILER))
-		CFLAGS+=-fprofile-generate=$(PROF_DIR) -fprofile-update=prefer-atomic
+		CFLAGS_PROF+=-fprofile-generate=$(PROF_DIR) -fprofile-update=prefer-atomic
 	else
 		$(warning Unrecognized compiler "$(CC)". Profile generation might not work, disable "PROFILE_GENERATE" if you get build errors about unrecognized flags)
-		CFLAGS+=-fprofile-generate=$(PROF_DIR)
+		CFLAGS_PROF+=-fprofile-generate=$(PROF_DIR)
 	endif
 endif
 
@@ -180,12 +184,12 @@ endif
 
 ifeq (1,$(PROFILE_USE))
 	ifeq (clang,$(COMPILER))
-		CFLAGS+=-fprofile-use=$(CLANG_PROF_MERGED)
+		CFLAGS_PROF+=-fprofile-use=$(CLANG_PROF_MERGED)
 	else
 		ifeq (gcc,$(COMPILER))
-			CFLAGS+=-fprofile-use=$(PROF_DIR) -fprofile-correction
+			CFLAGS_PROF+=-fprofile-use=$(PROF_DIR) -fprofile-correction
 		else
-			CFLAGS+=-fprofile-use=$(PROF_DIR)
+			CFLAGS_PROF+=-fprofile-use=$(PROF_DIR)
 		endif
 	endif
 endif
@@ -196,8 +200,9 @@ else
 	PROF_FINISH_COMMAND=
 endif
 
+CFLAGS_ALL:=$(CFLAGS_BASE) $(CFLAGS_OPT) $(CFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CC)
 ifeq (1,$(DEBUG))
-	CFLAGS+=$(DEBUG_CFLAGS)
+	CFLAGS_ALL+=$(DEBUG_CFLAGS)
 	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
 endif
 
@@ -230,13 +235,13 @@ prof_finish:
 %.o : %.c
 
 $(HIGH_PERF_OBJS): %.o: %.c $(DEPS) | prof_finish make_dep_dir
-	$(CC) $(DEP_FLAGS) $(CFLAGS) $(HIGH_OPT_CFLAGS) -c -o $@ $<
+	$(CC) $(DEP_FLAGS) $(CFLAGS_ALL) $(HIGH_OPT_CFLAGS) -c -o $@ $<
 
 %.o: %.c $(DEPS) | prof_finish make_dep_dir
-	$(CC) $(DEP_FLAGS) $(CFLAGS) -c -o $@ $<
+	$(CC) $(DEP_FLAGS) $(CFLAGS_ALL) -c -o $@ $<
 
 $(TARGET): $(OBJ) | make_prof_dir prof_finish
-	$(CC) $(CFLAGS) $(HIGH_OPT_CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS_ALL) $(HIGH_OPT_CFLAGS) $(FINAL_TARGET_CFLAGS) -o $@ $^ $(FINAL_STATIC_LINKS)
 
 ifeq (,$(DEPDIR))
 _DEPDIR_LOCATION=.
