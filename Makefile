@@ -78,11 +78,11 @@ FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG -DFAST_BUT_NO_VERIFY=1
 GCC_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
 CLANG_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
 TARGET=recipesAtHome
-HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h $(wildcard absl/base/*.h)
+HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h random_adapter.h $(wildcard absl/base/*.h) Xoshiro-cpp/XoshiroCpp.hpp
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 CXX_OBJS=
-CXX_HIGH_PERF_OBJS=
+CXX_HIGH_PERF_OBJS=random_adapter.o
 
 # Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 DEPDIR?=.deps
@@ -476,6 +476,16 @@ prof_finish:
 %.o : %.c
 %.o : %.cpp
 %.o : %.cc
+
+ifeq ($(PERFORMANCE_PROFILING),1)
+XOSHIRO_CXXFLAGS?=-fno-move-loop-invariants and -fno-unroll-loops
+endif
+ifeq ($(USE_DEPENDENCY_FILES),1)
+RANDOM_ADAPTER_DEP=$(DEPDIR)/random_adapter.dep
+endif
+
+random_adapter.o: random_adapter.cpp $(RANDOM_ADAPTER_DEP) | prof_finish make_dep_dir
+	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) $(HIGH_OPT_CFLAGS) $(XOSHIRO_CXXFLAGS) -c -o $@ $<
 
 $(CXX_HIGH_PERF_OBJS): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
 	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) $(HIGH_OPT_CFLAGS) -c -o $@ $<
