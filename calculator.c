@@ -39,7 +39,7 @@
 #define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
 #define DEFAULT_ITERATION_LIMIT_SHORT 75000l // Cutoff for iterations explored before resetting when short branches is randomly selected
 #define SHORT_ITERATION_LIMIT_CHANCE 40 // Chance (out of 100) for a thread to choose DEFAULT_ITERATION_LIMIT_SHORT instead of DEFAULT_ITERATION_LIMIT when starting a new branch
-#define ITERATION_LIMIT_INCREASE 100000000l // Amount to increase the iteration limit by when finding a new PB
+#define ITERATION_LIMIT_INCREASE 75000000l // Amount to increase the iteration limit by when finding a new PB
 // Basically 2.5*ITERATION_LIMIT_INCREASE, but keeps floats out of it so we can static_assert on it
 #define ITERATION_LIMIT_INCREASE_FIRST ((ITERATION_LIMIT_INCREASE << 1) + (ITERATION_LIMIT_INCREASE >> 1)) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
 #define ITERATION_LIMIT_MAX (12*ITERATION_LIMIT_INCREASE) // Maxumum iteration limit before increases shrink drastically (a soft maximum)
