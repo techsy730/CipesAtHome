@@ -3,10 +3,11 @@
 #include <omp.h>
 #include <libconfig.h>
 #include "base.h"
-
 #ifndef _CIPES_IS_WINDOWS
 #error "base.h wasn't loaded correctly"
 #endif
+
+#include "rand_replace.h"
 
 #include "inventory.h"
 #include "config.h"
@@ -294,6 +295,7 @@ int main(int argc, char **argv) {
 		{
 			printf("[Thread %d/%d][Done]\n", displayID, workerCount);
 		}
+		threadlocal_rand_destroy();
 	}
 
 	return 0;

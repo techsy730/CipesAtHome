@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "rand_replace.h"
 #include "base.h"
 #include "calculator.h"
 #include "FTPManagement.h"
@@ -1264,7 +1265,7 @@ void handleSelectAndRandom(struct BranchPath *curNode, int select, int randomise
 	// Arbitrarily skip over the fastest legal move with a given probability
 	if (select && curNode->moves < 55 && curNode->numLegalMoves > 0) {
 		int nextMoveIndex = 0;
-		while (nextMoveIndex < curNode->numLegalMoves - 1 && (rand() % 100) < SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE) {
+		while (nextMoveIndex < curNode->numLegalMoves - 1 && randint(0, 99) < SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE) {
 			if (checkShutdownOnIndexWithPrefetch(nextMoveIndex)) {
 				break;
 			}
@@ -2231,7 +2232,7 @@ void softMin(struct BranchPath *node) {
 	}
 
 	// Generate a random number between 0 and weightSum
-	int modSum = rand() % weightSum;
+	int modSum = randint(0, weightSum);
 
 	// Find the legal move that corresponds to the modSum
 	int index;
@@ -2270,8 +2271,8 @@ void shuffleLegalMoves(struct BranchPath *node) {
 		if (checkShutdownOnIndexWithPrefetch(i)) {
 			break;
 		}
-		int index1 = rand() % node->numLegalMoves;
-		int index2 = rand() % node->numLegalMoves;
+		int index1 = randint(0, node->numLegalMoves);
+		int index2 = randint(0, node->numLegalMoves);
 		struct BranchPath *temp = node->legalMoves[index1];
 		node->legalMoves[index1] = node->legalMoves[index2];
 		node->legalMoves[index2] = temp;
