@@ -13,13 +13,20 @@
 #error recipesAtHome requires at least C11 mode to build
 #endif
 
+#if defined __has_include
+#define _HAS_INCLUDE 1
+#if __has_include("sys/types.h")
+#define _HAS_INCLUDE_SYS_TYPES 1
+#endif
+#endif
+
 // Handle ssize_t
 #ifdef __cplusplus
 #include <cstddef>
-#elif !_CIPES_IS_WINDOWS && _POSIX_C_SOURCE >= 200112L
+#elif _HAS_INCLUDE_SYS_TYPES || (!_CIPES_IS_WINDOWS && _POSIX_C_SOURCE >= 200112L)
 #include <sys/types.h>
 #else
-typedef unsigned size_t ssize_t;
+typedef unsigned long ssize_t;
 #endif
 
 #ifdef __cplusplus
