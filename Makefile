@@ -57,8 +57,10 @@ FINAL_TARGET_CFLAGS=-Wl,--gc-sections
 CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
 EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
 CFLAGS_BASE:=-I .
-CXXFLAGS_BASE:=-std=c++17
+CXXFLAGS_BASE:=
 CFLAGS_PROF:=
+CFLAGS_STD?=-std=c17
+CXXFLAGS_STD?=-std=c++17
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
 DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DVERIFYING_SHIFTING_FUNCTIONS=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
@@ -123,6 +125,25 @@ endif
 ifeq ($(IS_CC_EMPTY) $(IS_CXX_EMPTY), 0 1)
 	$(error Cannot specify CXX without also specifying CC)
 endif
+
+# Now get the standard library versions of C and C++
+#DEFAULT_C_VERSION=$(shell $(CC) $(CFLAGS) -x c  -E -dM -< /dev/null | grep __STDC_VERSION__ | grep -E --only-matching '[[:digit:]]+')
+#ifneq ($(.SHELLSTATUS),0)
+#	DEFAULT_C_VERSION=0
+#endif
+#DEFAULT_CXX_VERSION=$(shell $(CXX) $(CXXFLAGS) -x c++ -E -dM -< /dev/null | grep __cplusplus | grep -P --only-matching '[[:digit:]]+(?=L)')
+#ifneq ($(.SHELLSTATUS),0)
+#	DEFAULT_CXX_VERSION=0
+#endif
+#
+#
+#ifeq ($(shell test $(DEFAULT_C_VERSION) -ge 201112 && echo true),true)  
+#DEFAULT_C_VERSION_AT_LEAST_C11=1
+#endif
+#
+#ifeq ($(shell test $(DEFAULT_CXX_VERSION) -ge 201112 && echo true),true)  
+#DEFAULT_C_VERSION_AT_LEAST_C17=1
+#endif
 
 DEBUG_EXPLICIT=0
 
@@ -413,11 +434,11 @@ else
 	PROF_FINISH_COMMAND=
 endif
 
-CFLAGS_ALL:=$(CFLAGS_BASE) $(CFLAGS_OPT) $(CFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CC)
+CFLAGS_ALL:=$(CFLAGS_BASE) $(CFLAGS_STD) $(CFLAGS_OPT) $(CFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CC)
 ifeq (,$(CXX_FLAGS))
 	CXX_FLAGS:=$(CFLAGS)
 endif
-CXXFLAGS_ALL:=$(CFLAGS_BASE) $(CXXFLAGS_BASE) $(CFLAGS_OPT) $(CXXFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CXX)
+CXXFLAGS_ALL:=$(CFLAGS_BASE) $(CXXFLAGS_STD) $(CXXFLAGS_BASE) $(CFLAGS_OPT) $(CXXFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CXX)
 
 ifeq (1,$(DEBUG))
 	ifeq (1,$(DEBUG_VERIFY_PROFILING))

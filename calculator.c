@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "random_adapter.h"
 #include "rand_replace.h"
 #include "base.h"
 #include "calculator.h"
