@@ -33,7 +33,7 @@
 #     google-perftools, libgoogle-perftools-dev
 # USE_DEPENDENCY_FILES=1
 #   Use the dependency file generation logic to only include headers needed by every C file to trigger a recompilation.
-#   This requires generating Makefile snippet .d files under DEPDIR
+#   This requires generating Makefile snippet .dep files under DEPDIR
 #   Adds DEPFLAGS to the CFLAGS if true
 #   If unset (or empty), this will be automatically chosen based on the compiler used.
 #   If set to false (whether explicit or automatically), when any header file change will trigger recompilation of all source files.
@@ -50,14 +50,21 @@
 
 
 
-WARNINGS_AND_ERRORS?=-Wall -Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds
+WARNINGS_AND_ERRORS?=-Wall -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds -Werror=narrowing
+WARNINGS_AND_ERRORS_CC?=-Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers
+WARNINGS_AND_ERRORS_CXX?=
+FINAL_TARGET_CFLAGS=-Wl,--gc-sections
 CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
-
 EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
-CFLAGS:=-I . -O2 $(CFLAGS)
-DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
+CFLAGS_BASE:=-I .
+CXXFLAGS_BASE:=
+CFLAGS_PROF:=
+CFLAGS_STD?=-std=c17
+CXXFLAGS_STD?=-std=c++17
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer
 DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DVERIFYING_SHIFTING_FUNCTIONS=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
+CFLAGS_OPT:=-O2
 HIGH_OPT_CFLAGS?=-O3
 GCC_ONLY_HIGH_OPT_CFLAGS?=
 # Trying to match x86-64-v2
@@ -75,14 +82,18 @@ FAST_CFLAGS_BUT_NO_VERIFY?=-DNO_MALLOC_CHECK=1 -DNDEBUG -DFAST_BUT_NO_VERIFY=1
 GCC_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
 CLANG_ONLY_FAST_CFLAGS_BUT_NO_VERIFY?=-fno-stack-protector -fno-stack-check -fno-sanitize=all
 TARGET=recipesAtHome
-HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h $(wildcard absl/base/*.h)
+HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculator.h logger.h shutdown.h base.h internal/base_essentials.h internal/base_asserts.h semver.h stacktrace.h random_adapter.h $(wildcard absl/base/*.h) Xoshiro-cpp/XoshiroCpp.hpp
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
+CXX_OBJS=
+CXX_HIGH_PERF_OBJS=
+# Those that import the Xoshiro header
+XOSHIRO_CXX_USAGE=random_adapter.o
 
 # Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 DEPDIR?=.deps
 # gcc, clang, and icc all recognize this syntax
-GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
+GCC_SYNTAX_DEP_FLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.dep
 
 RECOGNIZED_TRUE=1 true True TRUE yes Yes YES on On ON
 
@@ -103,6 +114,38 @@ IS_CC_EMPTY=0
 ifeq ($(CC),)
 	IS_CC_EMPTY=1
 endif
+
+IS_CXX_EXACTLY_CPP=0
+ifeq ($(CXX),cpp)
+	IS_CXX_EXACTLY_CPP=1
+endif
+IS_CXX_EMPTY=0
+ifeq ($(CXX),)
+	IS_CXX_EMPTY=1
+endif
+
+ifeq ($(IS_CC_EMPTY) $(IS_CXX_EMPTY), 0 1)
+	$(error Cannot specify CXX without also specifying CC)
+endif
+
+# Now get the standard library versions of C and C++
+#DEFAULT_C_VERSION=$(shell $(CC) $(CFLAGS) -x c  -E -dM -< /dev/null | grep __STDC_VERSION__ | grep -E --only-matching '[[:digit:]]+')
+#ifneq ($(.SHELLSTATUS),0)
+#	DEFAULT_C_VERSION=0
+#endif
+#DEFAULT_CXX_VERSION=$(shell $(CXX) $(CXXFLAGS) -x c++ -E -dM -< /dev/null | grep __cplusplus | grep -P --only-matching '[[:digit:]]+(?=L)')
+#ifneq ($(.SHELLSTATUS),0)
+#	DEFAULT_CXX_VERSION=0
+#endif
+#
+#
+#ifeq ($(shell test $(DEFAULT_C_VERSION) -ge 201112 && echo true),true)  
+#DEFAULT_C_VERSION_AT_LEAST_C11=1
+#endif
+#
+#ifeq ($(shell test $(DEFAULT_CXX_VERSION) -ge 201112 && echo true),true)  
+#DEFAULT_C_VERSION_AT_LEAST_C17=1
+#endif
 
 DEBUG_EXPLICIT=0
 
@@ -169,8 +212,22 @@ ifneq ($(IS_CC_EXACTLY_CC) $(IS_CC_EMPTY), 0 0)
 	ifeq ($(UNAME), Darwin)
 		MACPREFIX:=$(shell brew --prefix)
 		CC:=$(MACPREFIX)/opt/llvm/bin/clang
-		CFLAGS+=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib $(CFLAGS)
+		CFLAGS_BASE+=-I$(MACPREFIX)/include -L$(MACPREFIX)/lib
 	endif
+endif
+ifneq ($(IS_CXX_EXACTLY_CPP) $(IS_CXX_EMPTY) $(IS_CC_EMPTY), 0 0 0)
+	ifeq ($(UNAME), Linux)
+		CXX=g++
+	endif
+	ifeq ($(UNAME), Darwin)
+		MACPREFIX:=$(shell brew --prefix)
+		CXX:=$(MACPREFIX)/opt/llvm/bin/clang++
+	endif
+endif
+
+ifeq (,$(CXX))
+	# CC set but not CXX. Assume CXX is CC, because usually a C compiler can tell if a file is C++ and switch to C++ compiling mode.
+	CXX=$(CC)
 endif
 
 _64_BIT_MINGW=x86_64-w64-mingw
@@ -211,7 +268,6 @@ endif
 ifeq (clang,$(COMPILER))
 	WARNINGS_AND_ERRORS:=$(CLANG_ONLY_WARNINGS) $(WARNINGS_AND_ERRORS)
 endif
-CFLAGS:=$(WARNINGS_AND_ERRORS) $(CFLAGS)
 
 ifeq (1,$(FOR_DISTRIBUTION))
 ifeq (1,$(IS_WINDOWS))
@@ -248,23 +304,23 @@ ifeq (1,$(IS_WINDOWS_32))
 	EXTERNAL_LIBS+=-Llib_manually_provided/win32
 	# Format strings for size_t don't line up, and not really an easy way to fix it.
 	# Demote mismatching args to a warning
-	CFLAGS+=--warn-format
+	WARNINGS_AND_ERRORS+=--warn-format
 endif
 endif
 
 ifeq (1,$(IS_WINDOWS_32))
 	# Format strings for size_t don't line up, and not really an easy way to fix it.
 	# Demote mismatching args to a warning
-	CFLAGS:=$(filter-out -Werror=format,$(CFLAGS))
+	WARNINGS_AND_ERRORS:=$(filter-out -Werror=format,$(WARNINGS_AND_ERRORS))
 endif
 
-CFLAGS:=$(EXTERNAL_LIBS) $(CFLAGS)
+CFLAGS_BASE:=$(EXTERNAL_LIBS) $(CFLAGS_BASE)
 
 ifeq (1,$(FOR_DISTRIBUTION))
 ifeq (1,$(ASSUME_X86_64_V2))
-	CFLAGS:=$(SSE4_BUILD_CFLAGS) $(CFLAGS)
+	CFLAGS_OPT:=$(SSE4_BUILD_CFLAGS) $(CFLAGS_OPT)
 else ifeq (1,$(ASSUME_X86_64_V3))
-	CFLAGS:=$(AVX2_BUILD_CFLAGS) $(CFLAGS)
+	CFLAGS_OPT:=$(AVX2_BUILD_CFLAGS) $(CFLAGS_OPT)
 endif
 ifeq (,$(DISTRIBUTION_DIR))
 	DISTRIBUTION_DIR=$(shell $(CC) $(CFLAGS) -dumpmachine) 
@@ -275,30 +331,30 @@ ifeq (gcc,$(COMPILER))
 	HIGH_OPT_CFLAGS+=$(GCC_ONLY_HIGH_OPT_CFLAGS)
 endif
 ifeq (1,$(FAST_CFLAGS_BUT_NO_VERIFICATION))
-	CFLAGS+=$(FAST_CFLAGS_BUT_NO_VERIFY)
+	CFLAGS_OPT+=$(FAST_CFLAGS_BUT_NO_VERIFY)
 	ifeq (gcc,$(COMPILER))
-		CFLAGS+=$(GCC_ONLY_FAST_CFLAGS_BUT_NO_VERIFY)
+		CFLAGS_OPT+=$(GCC_ONLY_FAST_CFLAGS_BUT_NO_VERIFY)
 	else ifeq (clang,$(COMPILER))
-		CFLAGS+=$(CLANG_ONLY_FAST_CFLAGS_BUT_NO_VERIFY)
+		CFLAGS_OPT+=$(CLANG_ONLY_FAST_CFLAGS_BUT_NO_VERIFY)
 	endif
 endif
 ifeq (1,$(EXPERIMENTAL_OPTIMIZATIONS))
-	CFLAGS+=$(EXPERIMENTAL_OPT_CFLAGS)
+	CFLAGS_OPT+=$(EXPERIMENTAL_OPT_CFLAGS)
 endif
 
 ifeq (1,$(USE_GOOGLE_PERFTOOLS))
 	ifeq (1,$(PERFORMANCE_PROFILING))
 		DEBUG?=1
-		CFLAGS:= $(CFLAGS) -ltcmalloc_and_profiler
+		EXTERNAL_LIBS+=-ltcmalloc_and_profiler
 	else ifeq (1,$(DEBUG))
-		CFLAGS:=$(CFLAGS) -ltcmalloc
+		EXTERNAL_LIBS+=-ltcmalloc
 	else
-		CFLAGS:=$(CFLAGS) -ltcmalloc_minimal
+		EXTERNAL_LIBS+=-ltcmalloc_minimal
 	endif
 else
 	ifeq (1,$(PERFORMANCE_PROFILING))
 		DEBUG?=1
-		CFLAGS+=-pg
+		CFLAGS_OPT+=-pg
 	endif
 endif
 
@@ -318,7 +374,7 @@ ifeq (1,$(USE_DEPENDENCY_FILES))
 	ifeq (,$(DEP_FLAGS))
 		$(warning DEP_FLAGS is empty, but USE_DEPENDENCY_FILES=1; this will probably fail)
 	endif
-	DEPS:=$(DEPDIR)/%.d
+	DEPS:=$(DEPDIR)/%.dep
 	ifeq (,$(DEPDIR))
 		MAKE_DEPDIR_COMMAND:=
 	else ifeq (.,$(DEPDIR))
@@ -338,21 +394,21 @@ endif
 ifeq (1,$(USE_LTO))
 	ifeq (gcc,$(COMPILER))
 		DEBUG_CFLAGS+=-ffat-lto-objects
-		CFLAGS+=-fuse-ld=gold -flto=jobserver
+		CFLAGS_OPT+=-fuse-ld=gold -flto=jobserver
 	else
-		CFLAGS+=-flto
+		CFLAGS_OPT+=-flto
 	endif
 endif
 
 ifeq (1,$(PROFILE_GENERATE))
 	DEBUG?=1
 	ifeq (clang,$(COMPILER))
-		CFLAGS+=-fcs-profile-generate=$(PROF_DIR)
+		CFLAGS_PROF+=-fcs-profile-generate=$(PROF_DIR)
 	else ifeq (gcc,$(COMPILER))
-		CFLAGS+=-fprofile-generate=$(PROF_DIR) -fprofile-update=prefer-atomic
+		CFLAGS_PROF+=-fprofile-generate=$(PROF_DIR) -fprofile-update=prefer-atomic
 	else
 		$(warning Unrecognized compiler "$(CC)". Profile generation might not work, disable "PROFILE_GENERATE" if you get build errors about unrecognized flags)
-		CFLAGS+=-fprofile-generate=$(PROF_DIR)
+		CFLAGS_PROF+=-fprofile-generate=$(PROF_DIR)
 	endif
 endif
 
@@ -364,12 +420,12 @@ endif
 
 ifeq (1,$(PROFILE_USE))
 	ifeq (clang,$(COMPILER))
-		CFLAGS+=-fprofile-use=$(CLANG_PROF_MERGED)
+		CFLAGS_PROF+=-fprofile-use=$(CLANG_PROF_MERGED)
 	else
 		ifeq (gcc,$(COMPILER))
-			CFLAGS+=-fprofile-use=$(PROF_DIR) -fprofile-correction
+			CFLAGS_PROF+=-fprofile-use=$(PROF_DIR) -fprofile-correction
 		else
-			CFLAGS+=-fprofile-use=$(PROF_DIR)
+			CFLAGS_PROF+=-fprofile-use=$(PROF_DIR)
 		endif
 	endif
 endif
@@ -379,6 +435,12 @@ ifeq (1 clang, $(PROFILE_USE) $(COMPILER))
 else
 	PROF_FINISH_COMMAND=
 endif
+
+CFLAGS_ALL:=$(CFLAGS_BASE) $(CFLAGS_STD) $(CFLAGS_OPT) $(CFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CC)
+ifeq (,$(CXX_FLAGS))
+	CXX_FLAGS:=$(CFLAGS)
+endif
+CXXFLAGS_ALL:=$(CFLAGS_BASE) $(CXXFLAGS_STD) $(CXXFLAGS_BASE) $(CFLAGS_OPT) $(CXXFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CXX)
 
 ifeq (1,$(DEBUG))
 	ifeq (1,$(DEBUG_VERIFY_PROFILING))
@@ -396,7 +458,8 @@ ifeq (1,$(DEBUG))
 	ifeq (1,$(IS_WINDOWS))
 		DEBUG_CFLAGS:=$(filter-out -rdynamic,$(DEBUG_CFLAGS))
 	endif
-	CFLAGS+=$(DEBUG_CFLAGS)
+	CFLAGS_ALL+=$(DEBUG_CFLAGS)
+	CXXFLAGS_ALL+=$(DEBUG_CFLAGS)
 	HIGH_OPT_CFLAGS+=$(DEBUG_CFLAGS)
 endif
 
@@ -436,22 +499,41 @@ prof_finish:
 
 # Delete the default c compile rules
 %.o : %.c
+%.o : %.cpp
+%.o : %.cc
+
+ifeq ($(PERFORMANCE_PROFILING),1)
+XOSHIRO_CXXFLAGS?=-fno-move-loop-invariants and -fno-unroll-loops
+endif
+
+$(XOSHIRO_CXX_USAGE): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
+	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) $(HIGH_OPT_CFLAGS) $(XOSHIRO_CXXFLAGS) -c -o $@ $<
+
+$(CXX_HIGH_PERF_OBJS): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
+	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) $(HIGH_OPT_CFLAGS) -c -o $@ $<
 
 $(HIGH_PERF_OBJS): %.o: %.c $(DEPS) | prof_finish make_dep_dir
-	$(CC) $(DEP_FLAGS) $(CFLAGS) $(HIGH_OPT_CFLAGS) -c -o $@ $<
+	$(CC) $(DEP_FLAGS) $(CFLAGS_ALL) $(HIGH_OPT_CFLAGS) -c -o $@ $<
+
+$(CXX_OBJS): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
+	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) -c -o $@ $<
 
 %.o: %.c $(DEPS) | prof_finish make_dep_dir
-	$(CC) $(DEP_FLAGS) $(CFLAGS) -c -o $@ $<
+	$(CC) $(DEP_FLAGS) $(CFLAGS_ALL) -c -o $@ $<
 
-$(TARGET): $(OBJ) | make_prof_dir prof_finish
-	$(CC) $(CFLAGS) $(HIGH_OPT_CFLAGS) $(FINAL_TARGET_CFLAGS) -o $@ $^ $(FINAL_STATIC_LINKS)
+#%.o: %.cc $(DEPS) | prof_finish make_dep_dir
+#	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) -c -o $@ $<
+
+$(TARGET): $(OBJ) $(CXX_OBJS) $(HIGH_PERF_OBJS) $(CXX_HIGH_PERF_OBJS) $(XOSHIRO_CXX_USAGE) | make_prof_dir prof_finish
+	$(CC) $(CFLAGS_ALL) $(HIGH_OPT_CFLAGS) $(FINAL_TARGET_CFLAGS) -o $@ $^ $(FINAL_STATIC_LINKS)
 
 ifeq (,$(DEPDIR))
 _DEPDIR_LOCATION=.
 else
 _DEPDIR_LOCATION=$(DEPDIR)
 endif
-DEPFILES:=$(patsubst %.c,$(_DEPDIR_LOCATION)/%.d,$(wildcard *.c))
+DEPFILES:=$(patsubst %.c,$(_DEPDIR_LOCATION)/%.dep,$(wildcard *.c))
+DEPFILES+=$(patsubst %.cpp,$(_DEPDIR_LOCATION)/%.dep,$(wildcard *.cpp))
 
 # Have make ignore uncreated dep files if not generated yet
 # If they are generated, the include $(wildcard $(DEPFILES)) will overwrite these rules.
@@ -460,8 +542,8 @@ $(DEPFILES):
 clean:
 	$(RM) ./*.o
 	$(RM) ./$(TARGET) ./$(TARGET).exe
-	$(RM) ./*.d
-	$(RM) ./$(DEPDIR)/*.d
+	$(RM) ./*.dep
+	$(RM) ./$(DEPDIR)/*.dep
 
 _DO_REDUCED_CLEAN_PROF=0
 ifeq (,$(PROF_DIR))

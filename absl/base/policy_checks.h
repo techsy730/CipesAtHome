@@ -23,14 +23,9 @@
 
 #ifndef ABSL_BASE_POLICY_CHECKS_H_
 #define ABSL_BASE_POLICY_CHECKS_H_
-
 // Included for the __GLIBC_PREREQ macro used below.
 #include <limits.h>
-
-// Included for the _STLPORT_VERSION macro used below.
-#if defined(__cplusplus)
-#include <cstddef>
-#endif
+#endif  // ABSL_BASE_POLICY_CHECKS_H_
 
 // -----------------------------------------------------------------------------
 // Operating System Check
@@ -65,6 +60,19 @@
 #error "This package requires __apple_build_version__ of 4211165 or higher."
 #endif
 
+// Some checks we need to do twice. Once for C files, once for C++ files.
+#if defined(__cplusplus) && !defined(ABSL_BASE_POLICY_CHECKS_H_CXX_) || !defined(__cplusplus) && !defined(ABSL_BASE_POLICY_CHECKS_H_C_)
+#if defined(__cplusplus)
+#define ABSL_BASE_POLICY_CHECKS_H_CXX_
+#else
+#define ABSL_BASE_POLICY_CHECKS_H_C_
+#endif
+
+// Included for the _STLPORT_VERSION macro used below.
+#if defined(__cplusplus)
+#include <cstddef>
+#endif
+
 // -----------------------------------------------------------------------------
 // C++ Version Check
 // -----------------------------------------------------------------------------
@@ -72,9 +80,10 @@
 // Enforce C++11 as the minimum.  Note that Visual Studio has not
 // advanced __cplusplus despite being good enough for our purposes, so
 // so we exempt it from the check.
+// Cipes edit: Up to 2017 due to Xoshiro
 #if defined(__cplusplus) && !defined(_MSC_VER)
-#if __cplusplus < 201103L
-#error "C++ versions less than C++11 are not supported."
+#if __cplusplus < 201703L
+#error "C++ versions less than C++17 are not supported."
 #endif
 #endif
 
@@ -108,4 +117,4 @@
 #error "Abseil assumes that int is at least 4 bytes. "
 #endif
 
-#endif  // ABSL_BASE_POLICY_CHECKS_H_
+#endif  // ABSL_BASE_POLICY_CHECKS_H_C(XX)?_
