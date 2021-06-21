@@ -2473,7 +2473,6 @@ static bool handleAfterOptimizing(char (*destText)[50], int afterOptimizingFrame
 
 static void logCloseToPb(int ID, size_t preambleTextLength, const char preambleText[preambleTextLength], const struct BranchPath * curNode, int pbFrames, int afterOptimizingFrames, int level) {
 	if (will_log_level(level)) {
-		static const size_t outTextSize = 100;
 		_assert_with_stacktrace(preambleTextLength < 80);
 		char callString[30];
 		char outText[200];
