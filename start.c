@@ -216,6 +216,7 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
+#if 0  // Disabled for profiling
 	// Greeting message to user
 	int blob_record = getFastestRecordOnBlob();
 	if (blob_record == 0) {
@@ -225,6 +226,7 @@ int main(int argc, char **argv) {
 	else {
 		printf("The current fastest record is %d frames.\n", blob_record);
 	}
+#endif
 
 	// Verify that the results folder exists
 	// If not, create the directory
