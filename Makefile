@@ -50,16 +50,18 @@
 
 
 
-WARNINGS_AND_ERRORS?=-Wall -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds
+WARNINGS_AND_ERRORS?=-Wall -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds -Werror=narrowing
 WARNINGS_AND_ERRORS_CC?=-Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers
 WARNINGS_AND_ERRORS_CXX?=
 FINAL_TARGET_CFLAGS=-Wl,--gc-sections
 CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
 EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
 CFLAGS_BASE:=-I .
-CXXFLAGS_BASE:=-std=c++17
+CXXFLAGS_BASE:=
 CFLAGS_PROF:=
-DEBUG_CFLAGS?=-g -fno-omit-frame-pointer -rdynamic
+CFLAGS_STD?=-std=c17
+CXXFLAGS_STD?=-std=c++17
+DEBUG_CFLAGS?=-g -fno-omit-frame-pointer
 DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DVERIFYING_SHIFTING_FUNCTIONS=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 CFLAGS_OPT:=-O2
@@ -84,7 +86,9 @@ HEADERS=start.h inventory.h recipes.h config.h FTPManagement.h cJSON.h calculato
 OBJ=start.o inventory.o recipes.o config.o FTPManagement.o cJSON.o calculator.o logger.o shutdown.o base.o semver.o stacktrace.o
 HIGH_PERF_OBJS=calculator.o inventory.o recipes.o
 CXX_OBJS=
-CXX_HIGH_PERF_OBJS=random_adapter.o
+CXX_HIGH_PERF_OBJS=
+# Those that import the Xoshiro header
+XOSHIRO_CXX_USAGE=random_adapter.o
 
 # Depend system inspired from http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 DEPDIR?=.deps
@@ -123,6 +127,25 @@ endif
 ifeq ($(IS_CC_EMPTY) $(IS_CXX_EMPTY), 0 1)
 	$(error Cannot specify CXX without also specifying CC)
 endif
+
+# Now get the standard library versions of C and C++
+#DEFAULT_C_VERSION=$(shell $(CC) $(CFLAGS) -x c  -E -dM -< /dev/null | grep __STDC_VERSION__ | grep -E --only-matching '[[:digit:]]+')
+#ifneq ($(.SHELLSTATUS),0)
+#	DEFAULT_C_VERSION=0
+#endif
+#DEFAULT_CXX_VERSION=$(shell $(CXX) $(CXXFLAGS) -x c++ -E -dM -< /dev/null | grep __cplusplus | grep -P --only-matching '[[:digit:]]+(?=L)')
+#ifneq ($(.SHELLSTATUS),0)
+#	DEFAULT_CXX_VERSION=0
+#endif
+#
+#
+#ifeq ($(shell test $(DEFAULT_C_VERSION) -ge 201112 && echo true),true)  
+#DEFAULT_C_VERSION_AT_LEAST_C11=1
+#endif
+#
+#ifeq ($(shell test $(DEFAULT_CXX_VERSION) -ge 201112 && echo true),true)  
+#DEFAULT_C_VERSION_AT_LEAST_C17=1
+#endif
 
 DEBUG_EXPLICIT=0
 
@@ -413,11 +436,11 @@ else
 	PROF_FINISH_COMMAND=
 endif
 
-CFLAGS_ALL:=$(CFLAGS_BASE) $(CFLAGS_OPT) $(CFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CC)
+CFLAGS_ALL:=$(CFLAGS_BASE) $(CFLAGS_STD) $(CFLAGS_OPT) $(CFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CC)
 ifeq (,$(CXX_FLAGS))
 	CXX_FLAGS:=$(CFLAGS)
 endif
-CXXFLAGS_ALL:=$(CFLAGS_BASE) $(CXXFLAGS_BASE) $(CFLAGS_OPT) $(CXXFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CXX)
+CXXFLAGS_ALL:=$(CFLAGS_BASE) $(CXXFLAGS_STD) $(CXXFLAGS_BASE) $(CFLAGS_OPT) $(CXXFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CXX)
 
 ifeq (1,$(DEBUG))
 	ifeq (1,$(DEBUG_VERIFY_PROFILING))
@@ -482,11 +505,8 @@ prof_finish:
 ifeq ($(PERFORMANCE_PROFILING),1)
 XOSHIRO_CXXFLAGS?=-fno-move-loop-invariants and -fno-unroll-loops
 endif
-ifeq ($(USE_DEPENDENCY_FILES),1)
-RANDOM_ADAPTER_DEP=$(DEPDIR)/random_adapter.dep
-endif
 
-random_adapter.o: random_adapter.cpp $(RANDOM_ADAPTER_DEP) | prof_finish make_dep_dir
+$(XOSHIRO_CXX_USAGE): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
 	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) $(HIGH_OPT_CFLAGS) $(XOSHIRO_CXXFLAGS) -c -o $@ $<
 
 $(CXX_HIGH_PERF_OBJS): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
@@ -504,7 +524,7 @@ $(CXX_OBJS): %.o: %.cpp $(DEPS) | prof_finish make_dep_dir
 #%.o: %.cc $(DEPS) | prof_finish make_dep_dir
 #	$(CXX) $(DEP_FLAGS) $(CXXFLAGS_ALL) -c -o $@ $<
 
-$(TARGET): $(OBJ) $(CXX_OBJS) $(HIGH_PERF_OBJS) $(CXX_HIGH_PERF_OBJS) | make_prof_dir prof_finish
+$(TARGET): $(OBJ) $(CXX_OBJS) $(HIGH_PERF_OBJS) $(CXX_HIGH_PERF_OBJS) $(XOSHIRO_CXX_USAGE) | make_prof_dir prof_finish
 	$(CC) $(CFLAGS_ALL) $(HIGH_OPT_CFLAGS) $(FINAL_TARGET_CFLAGS) -o $@ $^ $(FINAL_STATIC_LINKS)
 
 ifeq (,$(DEPDIR))

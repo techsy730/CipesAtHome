@@ -7,6 +7,7 @@
 #error "base.h wasn't loaded correctly"
 #endif
 
+#include "random_adapter.h"
 #include "rand_replace.h"
 
 #include "inventory.h"
