@@ -22,12 +22,12 @@ extern "C" {
 #include "random_adapter.h"
 
 #if _CIPES_64_BIT
-typedef XoshiroCpp::Xoshiro256StarStar RandomGenType;
-static thread_local std::optional<RandomGenType> random_generator;
+typedef XoshiroCpp::Xoshiro256PlusPlus RandomGenType;
 #else
 typedef XoshiroCpp::Xoshiro128StarStar RandomGenType;
-static thread_local std::optional<XoshiroCpp::RandomGenType> random_generator;
 #endif
+
+static thread_local std::optional<RandomGenType> random_generator;
 
 static thread_local std::uniform_int_distribution like_rand_distribution(0, RAND_MAX);
 static thread_local std::uniform_int_distribution zero_to_99_distribution(0, 99);
