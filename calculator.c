@@ -18,6 +18,7 @@
 #include <omp.h>
 #include "absl/base/port.h"
 
+// DON'T TOUCH: These reflect the logic of Paper Mario TTYD itself. Changing these will result in invalid plans.
 #define CHOOSE_2ND_INGREDIENT_FRAMES 56 	// Penalty for choosing a 2nd item
 #define TOSS_FRAMES 32				// Penalty for having to toss an item
 #define ALPHA_SORT_FRAMES 38			// Penalty to perform alphabetical ascending sort
@@ -29,7 +30,7 @@
 // User configurable tunables
 #define WEAK_PB_FLOOR 4500		// If PB is above this value, consider it a "weak" PB and don't increase iteration limit as much.
 // Just so first runs (like from non-existant results dir) don't spend so long trying to "optimize" a "not all that great" branch.
-#define WEAK_PB_FLOOR_DIVISIOR 30 	// Divide limit increase by this if a "weak" PB.
+#define WEAK_PB_FLOOR_DIVISIOR 15 	// Divide limit increase by this if a "weak" PB.
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
 #define BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE 3 * BUFFER_SEARCH_FRAMES // Threshold for closeness to the current record to try spending more time on the branch
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
@@ -41,7 +42,7 @@
 #define ITERATION_LIMIT_INCREASE 100000000l // Amount to increase the iteration limit by when finding a new PB
 // Basically 2.5*ITERATION_LIMIT_INCREASE, but keeps floats out of it so we can static_assert on it
 #define ITERATION_LIMIT_INCREASE_FIRST ((ITERATION_LIMIT_INCREASE << 1) + (ITERATION_LIMIT_INCREASE >> 1)) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
-#define ITERATION_LIMIT_MAX (25*ITERATION_LIMIT_INCREASE) // Maxumum iteration limit before increases shrink drastically (a soft maximum)
+#define ITERATION_LIMIT_MAX (12*ITERATION_LIMIT_INCREASE) // Maxumum iteration limit before increases shrink drastically (a soft maximum)
 #define ITERATION_LIMIT_INCREASE_PAST_MAX (ITERATION_LIMIT_INCREASE/500) // Amount to increase the iteration limit by when finding a new record when past the max
 #define ITERATION_LIMIT_INCREASE_GETTING_CLOSE ITERATION_LIMIT_INCREASE_FIRST / 4
 #define ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE ITERATION_LIMIT_INCREASE_GETTING_CLOSE / 2
