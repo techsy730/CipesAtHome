@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "random_adapter.h"
+#include "rand_replace.h"
 #include "base.h"
 #include "calculator.h"
 #include "FTPManagement.h"
@@ -16,6 +18,7 @@
 #include <omp.h>
 #include "absl/base/port.h"
 
+// DON'T TOUCH: These reflect the logic of Paper Mario TTYD itself. Changing these will result in invalid plans.
 #define CHOOSE_2ND_INGREDIENT_FRAMES 56 	// Penalty for choosing a 2nd item
 #define TOSS_FRAMES 32				// Penalty for having to toss an item
 #define ALPHA_SORT_FRAMES 38			// Penalty to perform alphabetical ascending sort
@@ -27,7 +30,7 @@
 // User configurable tunables
 #define WEAK_PB_FLOOR 4500		// If PB is above this value, consider it a "weak" PB and don't increase iteration limit as much.
 // Just so first runs (like from non-existant results dir) don't spend so long trying to "optimize" a "not all that great" branch.
-#define WEAK_PB_FLOOR_DIVISIOR 30 	// Divide limit increase by this if a "weak" PB.
+#define WEAK_PB_FLOOR_DIVISIOR 15 	// Divide limit increase by this if a "weak" PB.
 #define BUFFER_SEARCH_FRAMES 150		// Threshold to try optimizing a roadmap to attempt to beat the current record
 #define BUFFER_SEARCH_FRAMES_KIND_OF_CLOSE 3 * BUFFER_SEARCH_FRAMES // Threshold for closeness to the current record to try spending more time on the branch
 #define VERBOSE_ITERATION_LOG_RATE 100000    // How many iterations before logging iteration progress verbosely (level 6 logging)
@@ -36,10 +39,10 @@
 #define DEFAULT_ITERATION_LIMIT 150000l // Cutoff for iterations explored before resetting
 #define DEFAULT_ITERATION_LIMIT_SHORT 75000l // Cutoff for iterations explored before resetting when short branches is randomly selected
 #define SHORT_ITERATION_LIMIT_CHANCE 40 // Chance (out of 100) for a thread to choose DEFAULT_ITERATION_LIMIT_SHORT instead of DEFAULT_ITERATION_LIMIT when starting a new branch
-#define ITERATION_LIMIT_INCREASE 100000000l // Amount to increase the iteration limit by when finding a new PB
+#define ITERATION_LIMIT_INCREASE 75000000l // Amount to increase the iteration limit by when finding a new PB
 // Basically 2.5*ITERATION_LIMIT_INCREASE, but keeps floats out of it so we can static_assert on it
 #define ITERATION_LIMIT_INCREASE_FIRST ((ITERATION_LIMIT_INCREASE << 1) + (ITERATION_LIMIT_INCREASE >> 1)) // Amount to increase the iteration limit by when finding a new PB for the first time in this branch
-#define ITERATION_LIMIT_MAX (25*ITERATION_LIMIT_INCREASE) // Maxumum iteration limit before increases shrink drastically (a soft maximum)
+#define ITERATION_LIMIT_MAX (12*ITERATION_LIMIT_INCREASE) // Maxumum iteration limit before increases shrink drastically (a soft maximum)
 #define ITERATION_LIMIT_INCREASE_PAST_MAX (ITERATION_LIMIT_INCREASE/500) // Amount to increase the iteration limit by when finding a new record when past the max
 #define ITERATION_LIMIT_INCREASE_GETTING_CLOSE ITERATION_LIMIT_INCREASE_FIRST / 4
 #define ITERATION_LIMIT_INCREASE_GETTING_KINDOF_CLOSE ITERATION_LIMIT_INCREASE_GETTING_CLOSE / 2
@@ -1264,7 +1267,7 @@ void handleSelectAndRandom(struct BranchPath *curNode, int select, int randomise
 	// Arbitrarily skip over the fastest legal move with a given probability
 	if (select && curNode->moves < 55 && curNode->numLegalMoves > 0) {
 		int nextMoveIndex = 0;
-		while (nextMoveIndex < curNode->numLegalMoves - 1 && (rand() % 100) < SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE) {
+		while (nextMoveIndex < curNode->numLegalMoves - 1 && randint(0, 99) < SELECT_CHANCE_TO_SKIP_SEEMINGLY_GOOD_MOVE) {
 			if (checkShutdownOnIndexWithPrefetch(nextMoveIndex)) {
 				break;
 			}
@@ -2231,7 +2234,7 @@ void softMin(struct BranchPath *node) {
 	}
 
 	// Generate a random number between 0 and weightSum
-	int modSum = rand() % weightSum;
+	int modSum = randint(0, weightSum);
 
 	// Find the legal move that corresponds to the modSum
 	int index;
@@ -2270,8 +2273,8 @@ void shuffleLegalMoves(struct BranchPath *node) {
 		if (checkShutdownOnIndexWithPrefetch(i)) {
 			break;
 		}
-		int index1 = rand() % node->numLegalMoves;
-		int index2 = rand() % node->numLegalMoves;
+		int index1 = randint(0, node->numLegalMoves);
+		int index2 = randint(0, node->numLegalMoves);
 		struct BranchPath *temp = node->legalMoves[index1];
 		node->legalMoves[index1] = node->legalMoves[index2];
 		node->legalMoves[index2] = temp;
@@ -2470,7 +2473,6 @@ static bool handleAfterOptimizing(char (*destText)[50], int afterOptimizingFrame
 
 static void logCloseToPb(int ID, size_t preambleTextLength, const char preambleText[preambleTextLength], const struct BranchPath * curNode, int pbFrames, int afterOptimizingFrames, int level) {
 	if (will_log_level(level)) {
-		static const size_t outTextSize = 100;
 		_assert_with_stacktrace(preambleTextLength < 80);
 		char callString[30];
 		char outText[200];

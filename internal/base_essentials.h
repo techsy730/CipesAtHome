@@ -14,7 +14,14 @@
 #define _XSTR(x) _STR(x)
 #endif
 
-#if defined(WIN32) || defined(WIN64) || defined(_MSC_FULL_VER) || defined(_MSC_VER) || defined(__MINGW32__)
+#if defined(_M_X64) || defined(__amd64__) || defined(__ppc64__) || defined(__LP64__) || defined(_LP64) || defined(WIN64) || defined(_WIN64)
+#define _CIPES_64_BIT 1
+#else
+#defined _CIPES_32_BIT 1
+#endif
+
+
+#if defined(WIN32) || defined(WIN64) || defined(_WIN32) || defined(_WIN64) || defined(_MSC_FULL_VER) || defined(_MSC_VER) || defined(__MINGW32__)
 #define _CIPES_IS_WINDOWS 1
 #else
 #define _CIPES_IS_WINDOWS 0
@@ -42,7 +49,6 @@
 #else
 #define VA_OPT_SUPPORTED 0
 #endif
-
 
 // Will NOT work in top level, use _REQUIRE_SEMICOLON_TOP_LEVEL_OK for that
 #define _REQUIRE_SEMICOLON do {} while(0)

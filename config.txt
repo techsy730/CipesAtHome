@@ -91,7 +91,7 @@
 # Feel free to remove it if you don't feel    #
 # comfortable advertising this is my fork,    #
 # feel free to remove it.                     #
-  Version = "1.14.2-TechSY730"                #
+  Version = "1.14.3-TechSY730"                #
 ###############################################
 
 ###############################################
