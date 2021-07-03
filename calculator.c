@@ -64,6 +64,14 @@ _CIPES_STATIC_ASSERT(CAPACITY_DECREASE_FLOOR > 0, "The floor for capacity must b
 #define NOISY_DEBUG(...) _REQUIRE_SEMICOLON
 //#endif
 
+#if VERIFYING_SHIFTING_FUNCTIONS
+#define _assert_for_shifting_function(condition) _assert_with_stacktrace(condition)
+// #elif defined(FAST_BUT_NO_VERIFY)
+#else
+#define _assert_for_shifting_function(condition) ABSL_INTERNAL_ASSUME_NO_ASSERT(condition)
+// #define _assert_for_shifting_function(condition)
+#endif
+
 static const int INT_OUTPUT_ARRAY_SIZE_BYTES = sizeof(outputCreatedArray_t);
 static const outputCreatedArray_t EMPTY_RECIPES = {0};
 
@@ -581,7 +589,9 @@ void freeAllNodes(struct BranchPath *node) {
 
 		// Delete node in nextNode's list of legal moves to prevent a double free
 		if (prevNode != NULL && prevNode->legalMoves != NULL) {
-			prevNode->legalMoves[0] = NULL;
+			if (prevNode->capacityLegalMoves > 0) {
+				prevNode->legalMoves[0] = NULL;
+			}
 			prevNode->numLegalMoves--;
 			shiftUpLegalMoves(prevNode, 1);
 		}
@@ -607,6 +617,7 @@ static void freeLegalMoveOnly(struct BranchPath *node, int index) {
 	node->legalMoves[index] = NULL;
 	node->numLegalMoves--;
 	node->next = NULL;
+	_assert_with_stacktrace(node->numLegalMoves >= 0);
 }
 
 /*-------------------------------------------------------------------
@@ -618,6 +629,10 @@ static void freeLegalMoveOnly(struct BranchPath *node, int index) {
  -------------------------------------------------------------------*/
 
 void freeLegalMove(struct BranchPath *node, int index) {
+	_assert_with_stacktrace(index < node->capacityLegalMoves);
+	_assert_with_stacktrace(index < node->numLegalMoves);
+	_assert_for_shifting_function(node->numLegalMoves <= node->capacityLegalMoves);
+
 	freeLegalMoveOnly(node, index);
 
 	// Shift up the rest of the legal moves
@@ -631,6 +646,9 @@ void freeLegalMove(struct BranchPath *node, int index) {
  * Free the current node and all legal moves within the node
  -------------------------------------------------------------------*/
 void freeNode(struct BranchPath *node) {
+	if (node == NULL) {
+		return;
+	}
 	if (node->description.data != NULL) {
 		free(node->description.data);
 	}
@@ -1396,8 +1414,7 @@ void insertIntoLegalMoves(int insertIndex, struct BranchPath *mutableNewLegalMov
 	if (capacityChanges.needsRealloc) {
 		// Failsafes. Ensure we are at least reaching the target of new size
 		// Reallocate the legalMove array to make room for a new legal move
-		struct BranchPath **temp = realloc(curNode->legalMoves, sizeof(struct BranchPath*) * (capacityChanges.newCapacity));
-
+		struct BranchPath **temp = realloc(curNode->legalMoves, sizeof(curNode->legalMoves[0]) * (capacityChanges.newCapacity));
 		checkMallocFailed(temp);
 
 		curNode->legalMoves = temp;
@@ -2084,14 +2101,6 @@ int selectSecondItemFirst(int *ingredientLoc, size_t nulls, int viableItems) {
 		   && (ingredientLoc[0] - (int)nulls) >= viableItems/2;
 }
 
-#ifdef VERIFYING_SHIFTING_FUNCTIONS
-#define _assert_for_shifting_function(condition) _assert_with_stacktrace(condition)
-// #elif defined(FAST_BUT_NO_VERIFY)
-#else
-#define _assert_for_shifting_function(condition) ABSL_INTERNAL_ASSUME_NO_ASSERT(condition)
-// #define _assert_for_shifting_function(condition)
-#endif
-
 /*-------------------------------------------------------------------
  * Function 	: shiftDownLegalMoves
  * Inputs	: struct BranchPath	*node
@@ -2147,20 +2156,33 @@ void shiftDownLegalMoves(struct BranchPath *node, int lowerBound, int uppderBoun
  * do it themselves.
  -------------------------------------------------------------------*/
 void shiftUpLegalMoves(struct BranchPath *node, int startIndex) {
-	if (startIndex == 0) return;
-	_assert_for_shifting_function(node != NULL);
-	struct BranchPath **legalMoves = node->legalMoves;
-#ifdef VERIFYING_SHIFTING_FUNCTIONS
-	if (startIndex == node->numLegalMoves + 1) {
-		// Null where the last entry was before shifting
-		legalMoves[node->numLegalMoves] = NULL;
+	_assert_with_stacktrace(startIndex > 0);
+	if (node->numLegalMoves == 0) {
+		// Nothing to shift
+		_assert_for_shifting_function(startIndex == 0 || startIndex == 1);
+#if VERIFYING_SHIFTING_FUNCTIONS || AGGRESSIVE_0_ALLOCATING
+			if (node->capacityLegalMoves > 0) {
+				node->legalMoves[0] = NULL;
+			}
+#endif
 		return;
 	}
-#endif
+	_assert_for_shifting_function(node != NULL);
+	struct BranchPath **legalMoves = node->legalMoves;
 	_assert_for_shifting_function(node->numLegalMoves >= 0);
 	_assert_for_shifting_function(startIndex >= 1);
+	if (startIndex == node->numLegalMoves + 1) {
+		// We just freed the last element of the previous array.
+#if VERIFYING_SHIFTING_FUNCTIONS || AGGRESSIVE_0_ALLOCATING
+		// Null where the last entry was before shifting
+		legalMoves[node->numLegalMoves] = NULL;
+#endif
+		return;
+	}
 	_assert_for_shifting_function(startIndex <= node->numLegalMoves);
 	_assert_for_shifting_function(node->numLegalMoves < node->capacityLegalMoves);
+	// Make sure we are actually shifting into a NULL slot.
+	_assert_for_shifting_function(node->legalMoves[startIndex - 1] == NULL);
 	memmove(&legalMoves[startIndex - 1], &legalMoves[startIndex], sizeof(&legalMoves[0])*(node->numLegalMoves - startIndex + 1));
 	/*for (int i = startIndex; i <= node->numLegalMoves; i++) {
 		node->legalMoves[i-1] = node->legalMoves[i];
@@ -2691,6 +2713,7 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 		// We have passed the iteration maximum
 		// Free everything before reinitializing
 		freeAllNodes(curNode);
+		curNode = NULL;
 
 		// Check the cache to see if a result was generated
 		if (result_cache.frames > -1) {
@@ -2730,6 +2753,11 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 						int localRecord = getLocalRecord();
 						if (ABSL_PREDICT_FALSE(localRecord < 0)) {
 							recipeLog(1, "Calculator", "Roadmap", "Error", "Current cached local record is corrupt (less then 0 frames). Not writing invalid PB file but your PB may be lost.");
+						} else if (ABSL_PREDICT_FALSE(localRecord > UNSET_FRAME_RECORD)) {
+							char reportStr[200];
+							sprintf(reportStr, "Current cached local record is corrupt (current [%d] greater then nonsense upper bound of [%d]). Not writing invalid PB file but your PB may be lost.",
+								localRecord, UNSET_FRAME_RECORD);
+							recipeLog(1, "Calculator", "Roadmap", "Error", reportStr);
 						} else {
 							fprintf(fp, "%d", localRecord);
 						}

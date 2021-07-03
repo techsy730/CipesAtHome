@@ -5,7 +5,24 @@
  */
 
 #ifndef CIPES_BASE_ESSENTIALS_H
-#define BASE_ESSENTIALS_H
+#define CIPES_BASE_ESSENTIALS_H
+
+// Pre declare these for code completion
+
+// Whether to (try to) print stack traces on crashing failures
+#ifndef INCLUDE_STACK_TRACES
+#define INCLUDE_STACK_TRACES 0
+#endif
+
+// Whether to put additional checks on the shifting left and right functions in calculator.c
+#ifndef VERIFYING_SHIFTING_FUNCTIONS
+#define VERIFYING_SHIFTING_FUNCTIONS 0
+#endif
+
+// Whether to be more aggressive 0-ing out new data structures (e.g. calloc vs malloc)
+#ifndef AGGRESSIVE_0_ALLOCATING
+#define AGGRESSIVE_0_ALLOCATING 0
+#endif
 
 #ifndef _STR
 #define _STR(x) #x
@@ -17,7 +34,7 @@
 #if defined(_M_X64) || defined(__amd64__) || defined(__ppc64__) || defined(__LP64__) || defined(_LP64) || defined(WIN64) || defined(_WIN64)
 #define _CIPES_64_BIT 1
 #else
-#defined _CIPES_32_BIT 1
+#define _CIPES_32_BIT 1
 #endif
 
 
@@ -52,20 +69,20 @@
 
 // __cplusplus == 201103L means C++11
 #ifdef __cplusplus
-#if __cplusplus >= 201103L && !defined(__CDT_PARSER__)
+#if __cplusplus >= 201103L//  && !defined(__CDT_PARSER__)
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(ignored) static_assert(true, "Never should see this error")
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(DoNotUse)
-#define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(n) static_assert(true, "Never should see this error")
 #else
-#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(DoNotUse)
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(n) struct ABSL_ATTRIBUTE_UNUSED __##n
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(DoNotUse)
 #endif
 #elif (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L) && !defined(__CDT_PARSER__)
 // __STDC_VERSION__ == 201112L means C11
-#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse)
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(ignored) _Static_assert(true, "Never should see this error")
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse)
 #else
-#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK ABSL_ATTRIBUTE_UNUSED _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse)
 #define _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(n) ABSL_ATTRIBUTE_UNUSED static int __##n
+#define _REQUIRE_SEMICOLON_TOP_LEVEL_OK ABSL_ATTRIBUTE_UNUSED _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse)
 #endif
 
 // Will NOT work in top level, use _REQUIRE_SEMICOLON_TOP_LEVEL_OK for that
