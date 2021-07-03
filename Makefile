@@ -50,10 +50,10 @@
 
 
 
-WARNINGS_AND_ERRORS?=-Wall -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds -Werror=narrowing
+WARNINGS_AND_ERRORS?=-Wall -Werror=format-overflow -Werror=format-truncation -Werror=format-extra-args -Werror=format -Werror=maybe-uninitialized -Werror=array-bounds -Werror=narrowing -Werror=unknown-pragmas
 WARNINGS_AND_ERRORS_CC?=-Werror=implicit-function-declaration -Werror=implicit-int -Werror=incompatible-pointer-types -Werror=discarded-qualifiers
 WARNINGS_AND_ERRORS_CXX?=
-FINAL_TARGET_CFLAGS=-Wl,--gc-sections
+FINAL_TARGET_CFLAGS?=-Wl,--gc-sections
 CLANG_ONLY_WARNINGS?=-Wno-unused-command-line-argument -Wno-unknown-warning-option
 EXTERNAL_LIBS=-lcurl -lconfig -fopenmp
 CFLAGS_BASE:=-I .
@@ -62,7 +62,7 @@ CFLAGS_PROF:=
 CFLAGS_STD?=-std=c17
 CXXFLAGS_STD?=-std=c++17
 DEBUG_CFLAGS?=-g -fno-omit-frame-pointer
-DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DVERIFYING_SHIFTING_FUNCTIONS=1
+DEBUG_EXTRA_CFLAGS?=-DINCLUDE_STACK_TRACES=1 -DVERIFYING_SHIFTING_FUNCTIONS=1 -DAGGRESSIVE_0_ALLOCATING=1
 DEBUG_VERIFY_PROFILING_CFLAGS?=
 CFLAGS_OPT:=-O2
 HIGH_OPT_CFLAGS?=-O3
@@ -104,7 +104,7 @@ CLANG_PROF_MERGED?=$(TARGET).profdata
 # .gcda and .gcno from GCC
 # .profraw and .profdata from clang
 # .dpi from ICC
-KNOWN_PROFILE_DATA_EXTENSIONS=*.gcda *.gcno *.profraw *.profdata *.dpi 
+KNOWN_PROFILE_DATA_EXTENSIONS=*.gcda *.gcno *.profraw *.profdata *.dpi *.cpuprof *.heap
 
 IS_CC_EXACTLY_CC=0
 ifeq ($(CC),cc)
@@ -181,6 +181,8 @@ ifneq (,$(filter $(RECOGNIZED_TRUE), $(DEBUG_VERIFY_PROFILING)))
 endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_GOOGLE_PERFTOOLS)))
 	USE_GOOGLE_PERFTOOLS=1
+else
+	USE_GOOGLE_PERFTOOLS=0
 endif
 ifneq (,$(filter $(RECOGNIZED_TRUE), $(USE_DEPENDENCY_FILES)))
 	USE_DEPENDENCY_FILES=1
@@ -436,16 +438,17 @@ else
 	PROF_FINISH_COMMAND=
 endif
 
-CFLAGS_ALL:=$(CFLAGS_BASE) $(CFLAGS_STD) $(CFLAGS_OPT) $(CFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CC)
+CFLAGS_ALL:=$(CFLAGS_BASE) $(CFLAGS_STD) $(CFLAGS_OPT) $(CFLAGS_PROF) $(CFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CC)
 ifeq (,$(CXX_FLAGS))
-	CXX_FLAGS:=$(CFLAGS)
+	CXXFLAGS:=$(CFLAGS)
 endif
-CXXFLAGS_ALL:=$(CFLAGS_BASE) $(CXXFLAGS_STD) $(CXXFLAGS_BASE) $(CFLAGS_OPT) $(CXXFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CXX)
+CXXFLAGS_ALL:=$(CFLAGS_BASE) $(CXXFLAGS_STD) $(CXXFLAGS_BASE) $(CFLAGS_OPT) $(CFLAGS_PROF) $(CXXFLAGS) $(EXTERNAL_LIBS) $(WARNINGS_AND_ERRORS) $(WARNINGS_AND_ERRORS_CXX)
 
 ifeq (1,$(DEBUG))
 	ifeq (1,$(DEBUG_VERIFY_PROFILING))
 		ifeq (gcc 0,$(COMPILER) $(USE_GOOGLE_PERFTOOLS))
-			DEBUG_VERIFY_PROFILING_CFLAGS+=-static-libasan -fsanitize=address
+			# DEBUG_VERIFY_PROFILING_CFLAGS+=-static-libasan -fsanitize=address
+			DEBUG_VERIFY_PROFILING_CFLAGS+=-lasan -fsanitize=address -fno-optimize-sibling-calls
 		endif
 		DEBUG_CFLAGS+=$(DEBUG_VERIFY_PROFILING_CFLAGS)
 	endif
