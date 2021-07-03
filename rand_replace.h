@@ -10,16 +10,17 @@
 #ifndef RAND_REPLACE_H_
 #define RAND_REPLACE_H_
 
-#include "random_adapter.h"
-#include "absl/base/port.h"
+#include "thread_local_random.h"
+#include "internal/real_rands.h"
 
+// Redefining built-ins is a risky proposition for sure, but seems to work fine on
+// most compilers as few try to do any fancy "compiler magic" with rand due to the (by nature) non "pureness" of it.
 #define rand threadlocal_rand
 
-ABSL_ATTRIBUTE_ALWAYS_INLINE
-inline int randint(int min, int max) {
-	return threadlocal_randint(min, max);
-}
+#define randint threadlocal_randint
 
 #define srand threadlocal_srand
+
+#define _RAND_REPLACE_REPLACEMENTS_DONE 1
 
 #endif /* RAND_REPLACE_H_ */
