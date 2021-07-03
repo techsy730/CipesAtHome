@@ -6,13 +6,13 @@
 
 #ifndef CIPES_BASE_ASSERT_H
 #define CIPES_BASE_ASSERT_H
-#ifndef CIPES_BASE_H
+#if !defined(CIPES_BASE_H) && !defined(STACKTRACE_H_)
 #error This header file is only supposed to be included from base.h
 #endif
 
 // Eclipse does not like static_assert in C code even though it is part of the standard now.
 // The __CDT_PARSER__ macro is only active for Eclipse's parsing for symbols, not its compilation.
-#ifdef __CDT_PARSER__
+#if defined(__CDT_PARSER__) && !defined(__cplusplus)
 #define _CIPES_STATIC_ASSERT(condition, message) _REQUIRE_SEMICOLON_TOP_LEVEL_WITH_CUSTOM_STUB_NAME(doNotUse_stubbedOutStaticAssert)
 // __cplusplus == 201103L means C++11
 // __STDC_VERSION__ == 201112L means C11
@@ -28,7 +28,7 @@ COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
 #define _assert_with_stacktrace(condition) ABSL_INTERNAL_ASSUME(condition)
 #elif NO_STACK_TRACE_ASSERT
 #define _assert_with_stacktrace(condition) assert(condition)
-#elif defined(INCLUDE_STACK_TRACES)
+#elif INCLUDE_STACK_TRACES
 #if __cplusplus >= 201103L // C++11 or greater
 #define _assert_with_stacktrace(condition) ({ \
   auto _condition = ABSL_PREDICT_TRUE((condition)_; \
