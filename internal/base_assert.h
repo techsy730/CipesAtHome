@@ -17,7 +17,7 @@
 // __cplusplus == 201103L means C++11
 // __STDC_VERSION__ == 201112L means C11
 #elif (defined(__cplusplus) && __cplusplus >= 201103L) \
-	|| (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L)
+  || (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L)
 #define _CIPES_STATIC_ASSERT(condition, message) static_assert(condition, message ": " #condition " (" _XSTR(condition) ") is NOT true")
 #else
 COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
@@ -33,52 +33,52 @@ COMPILER_WARNING("Unable to use static_assert, static_asserts will be ignored")
 #define _assert_with_stacktrace(condition) ({ \
   auto _condition = ABSL_PREDICT_TRUE((condition)_; \
   if (!_condition) { \
-  	_abrt_from_assert = true; \
+    _abrt_from_assert = true; \
     _Pragma("omp critical(printing_on_failure)") \
-		{ \
-			printStackTraceF(stderr); \
-			fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
-		} \
-  	assert(condition); \
-	} \
+    { \
+      printStackTraceF(stderr); \
+      fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
+    } \
+    assert(condition); \
+  } \
 })
 #elif SUPPORTS_AUTOTYPE && !defined(__CDT_PARSER__)
 #define _assert_with_stacktrace(condition) ({ \
   __auto_type _condition = ABSL_PREDICT_TRUE(condition); \
   if (!_condition) { \
-		_abrt_from_assert = true; \
-  	_Pragma("omp critical(printing_on_failure)") \
-		{ \
-			printStackTraceF(stderr); \
-			fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
-		} \
-		assert(condition); \
+    _abrt_from_assert = true; \
+    _Pragma("omp critical(printing_on_failure)") \
+    { \
+      printStackTraceF(stderr); \
+      fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
+    } \
+    assert(condition); \
   } \
 })
 #elif SUPPORTS_TYPEOF
 #define _assert_with_stacktrace(condition) ({ \
   typeof(condition) _condition = ABSL_PREDICT_TRUE(condition); \
   if (!_condition) { \
-		_abrt_from_assert = true; \
-  	_Pragma("omp critical(printing_on_failure)") \
-		{ \
-			printStackTraceF(stderr); \
-			fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
-		} \
-		assert(condition); \
-	} \
+    _abrt_from_assert = true; \
+    _Pragma("omp critical(printing_on_failure)") \
+    { \
+      printStackTraceF(stderr); \
+      fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
+    } \
+    assert(condition); \
+  } \
 })
 #else
 #define _assert_with_stacktrace(condition) ({ \
   if (! ABSL_PREDICT_TRUE(condition)) { \
-  	_abrt_from_assert = true; \
-  	_Pragma("omp critical(printing_on_failure)") \
-		{ \
-			printStackTraceF(stderr); \
-			fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
-		} \
-  	assert(condition); \
-	} \
+    _abrt_from_assert = true; \
+    _Pragma("omp critical(printing_on_failure)") \
+    { \
+      printStackTraceF(stderr); \
+      fprintf(stderr, "%s (%s) is NOT true.\n", #condition, _XSTR(condition)); \
+    } \
+    assert(condition); \
+  } \
 })
 #endif
 #else
