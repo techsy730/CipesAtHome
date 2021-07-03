@@ -1,21 +1,25 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "random_adapter.h"
-#include "rand_replace.h"
+#include <libconfig.h>
+#include <time.h>
+#if AGGRESSIVE_0_ALLOCATING || VERIFYING_SHIFTING_FUNCTIONS
+// Pull in the "_s" bounds checking functions
+#define __STDC_WANT_LIB_EXT1__ 1
+#endif
+#include <string.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <assert.h>
+#include <omp.h>
 #include "base.h"
 #include "calculator.h"
 #include "FTPManagement.h"
 #include "recipes.h"
 #include "start.h"
 #include "shutdown.h"
-#include <libconfig.h>
 #include "logger.h"
-#include <time.h>
-#include <string.h>
-#include <stdbool.h>
-#include <limits.h>
-#include <assert.h>
-#include <omp.h>
+#include "rand_replace.h"
+
 #include "absl/base/port.h"
 
 #define CHOOSE_2ND_INGREDIENT_FRAMES 56 	// Penalty for choosing a 2nd item
@@ -441,6 +445,23 @@ void createCookDescription2Items(const struct BranchPath *node, struct Recipe re
 	generateFramesTaken(useDescription, node, *tempFrames);
 }
 
+
+/*-------------------------------------------------------------------
+ * Function 	: createMoveQuick
+ *
+ * Outputs	: struct BranchPath *newMoveNode
+ *
+ * Allocates a BranchPath struct on the heap, with the assurance that
+ * the callee will either initialize the strcut's value to sane values,
+ * or doesn't care in it's usage case.
+ */
+static struct BranchPath *createMoveQuick() {
+	struct BranchPath *node = malloc(sizeof(struct BranchPath));
+	checkMallocFailed(node);
+	return node;
+}
+
+
 /*-------------------------------------------------------------------
  * Function 	: createLegalMove
  * Inputs	: struct BranchPath		*node
@@ -457,7 +478,7 @@ void createCookDescription2Items(const struct BranchPath *node, struct Recipe re
 struct BranchPath *createLegalMove(struct BranchPath *mutableNode, struct Inventory inventory, MoveDescription description, const outputCreatedArray_t outputsFulfilled, int numOutputsFulfilled) {
   // Prefer to work with the const version when possible to ensure we really don't modify it.
   const struct BranchPath *node = mutableNode;
-	struct BranchPath *newLegalMove = malloc(sizeof(struct BranchPath));
+	struct BranchPath *newLegalMove = createMoveQuick();
 
 	checkMallocFailed(newLegalMove);
 
@@ -479,6 +500,20 @@ struct BranchPath *createLegalMove(struct BranchPath *mutableNode, struct Invent
 	}
 
 	return newLegalMove;
+}
+
+/*-------------------------------------------------------------------
+ * Function 	: createMoveRaw
+ *
+ * Outputs	: struct BranchPath *newMoveNode
+ *
+ * Allocates a BranchPath struct on the heap, setting some critical values
+ * to sane initial values.
+ */
+static struct BranchPath *createMoveZeroed() {
+	struct BranchPath *node = calloc(sizeof(struct BranchPath), 1);
+	checkMallocFailed(node);
+	return node;
 }
 
 /*-------------------------------------------------------------------
@@ -1324,7 +1359,7 @@ void handleSorts(struct BranchPath *curNode) {
  * Generate the root of the tree graph
  -------------------------------------------------------------------*/
 struct BranchPath *initializeRoot() {
-	struct BranchPath *root = malloc(sizeof(struct BranchPath));
+	struct BranchPath *root = createMoveQuick();
 
 	checkMallocFailed(root);
 
@@ -1348,6 +1383,7 @@ struct BranchPath *initializeRoot() {
 
 struct CapacityComputationResult {
 	ssize_t newCapacity;
+	ssize_t capacityIncreasedBy;
 	bool needsRealloc;
 	bool needsShrink;
 };
@@ -1390,7 +1426,8 @@ static struct CapacityComputationResult capacityCompute(const ssize_t currentCap
 		// The above logic should _never_ shrink when we were expecting increase.
 		_assert_with_stacktrace(needsShrink || newCapacity > currentCapacity);
 	}
-	return (struct CapacityComputationResult){newCapacity, needsRealloc, needsShrink};
+	ssize_t capacityIncreasedBy = newCapacity - currentCapacity;
+	return (struct CapacityComputationResult){newCapacity, capacityIncreasedBy, needsRealloc, needsShrink};
 }
 
 /*-------------------------------------------------------------------
@@ -1416,6 +1453,22 @@ void insertIntoLegalMoves(int insertIndex, struct BranchPath *mutableNewLegalMov
 		// Reallocate the legalMove array to make room for a new legal move
 		struct BranchPath **temp = realloc(curNode->legalMoves, sizeof(curNode->legalMoves[0]) * (capacityChanges.newCapacity));
 		checkMallocFailed(temp);
+#if AGGRESSIVE_0_ALLOCATING
+		// Zero out the new parts of the array so viewing array contents doesn't cause dereferencing of invalid pointers,
+		// which may mess up debuggers.
+#if defined(__STDC_LIB_EXT1__) && __STDC_WANT_LIB_EXT1__
+		_assert_with_stacktrace(0 == memset_s(
+				temp + curNode->capacityLegalMoves,
+				capacityChanges.newCapacity - curNode->capacityLegalMoves,
+				0,
+				sizeof(curNode->legalMoves[0]) * capacityChanges.capacityIncreasedBy));
+#else
+		memset(
+				temp + curNode->capacityLegalMoves,
+				0,
+				sizeof(curNode->legalMoves[0]) * capacityChanges.capacityIncreasedBy);
+#endif
+#endif
 
 		curNode->legalMoves = temp;
 		curNode->capacityLegalMoves = capacityChanges.newCapacity;
@@ -1499,7 +1552,7 @@ struct BranchPath *copyAllNodes(struct BranchPath *newNode, const struct BranchP
 		newNode->numLegalMoves = 0;
 		newNode->capacityLegalMoves = 0;
 		if (newNode->numOutputsCreated < NUM_RECIPES) {
-			newNode->next = malloc(sizeof(struct BranchPath));
+			newNode->next = createMoveZeroed();
 
 			checkMallocFailed(newNode->next);
 
@@ -1528,7 +1581,7 @@ struct BranchPath *copyAllNodes(struct BranchPath *newNode, const struct BranchP
  -------------------------------------------------------------------*/
 struct OptimizeResult optimizeRoadmap(const struct BranchPath *root) {
 	// First copy all nodes to new memory locations so we can begin rearranging nodes
-	struct BranchPath *newRoot = malloc(sizeof(struct BranchPath));
+	struct BranchPath *newRoot = createMoveZeroed();
 
 	checkMallocFailed(newRoot);
 
@@ -1998,7 +2051,7 @@ void reallocateRecipes(struct BranchPath* mutableNewRoot, const enum Type_Sort* 
 			exit(1);
 		}
 
-		struct BranchPath *insertNode = malloc(sizeof(struct BranchPath));
+		struct BranchPath *insertNode = createMoveZeroed();
 		checkMallocFailed(insertNode);
 
 		// Set pointers to and from surrounding structs
@@ -2454,6 +2507,7 @@ static void logIterationsAfterPB(int ID, int stepIndex, const struct BranchPath 
 		recipeLog(level, "Calculator", "Info", callString, iterationString);
 	}
 }
+
 /*-------------------------------------------------------------------
  * Function 	: calculateOrder
  * Inputs	: int ID
@@ -2623,9 +2677,10 @@ struct Result calculateOrder(const int rawID, long max_branches) {
 						return (struct Result) {-1, -1};
 					}
 
-					curNode = curNode->prev;
-					freeLegalMove(curNode, 0);
-					curNode->next = NULL;
+					struct BranchPath* curNodePrev = curNode->prev;
+					freeLegalMove(curNodePrev, 0);
+					curNodePrev->next = NULL;
+					curNode = curNodePrev;
 					stepIndex--;
 					continue;
 				}
