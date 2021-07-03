@@ -1,7 +1,5 @@
 #include "base.h"
 
-// Holy crap, getting stack traces is a giant pain.
-
 #ifdef __cplusplus
 extern "C" {
 #endif

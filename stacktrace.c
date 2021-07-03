@@ -3,11 +3,15 @@
 #include <stdio.h>
 #include <omp.h>
 
+#ifdef __GLIBC__
+#include <stdlib.h>  // For free()
+#endif
+
 #include "absl/base/port.h"
 #include "openmp_once.h"
 
 
-#ifdef INCLUDE_STACK_TRACES
+#if INCLUDE_STACK_TRACES
 #ifdef __GLIBC__ // Sorely lacking, but hopefully should work good enough.
 #include <execinfo.h>
 #include <pthread.h>
@@ -22,11 +26,7 @@
 #endif // __GLIBC__, _CIPES_IS_WINDOWS
 #endif // INCLUDE_STACK_TRACES
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifdef INCLUDE_STACK_TRACES
+#if INCLUDE_STACK_TRACES
 #if _CIPES_IS_WINDOWS
 
 static bool getAndAddCurrentProcessId();
