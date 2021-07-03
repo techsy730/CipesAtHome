@@ -40,8 +40,6 @@
 
 #define WAIT_TIME_BEFORE_CONTINUE_ON_FAILED_UPDATE_CHECK_SECS 10
 
-#define UNSET_FRAME_RECORD 9999
-
 int current_frame_record;
 const char *local_ver;
 
