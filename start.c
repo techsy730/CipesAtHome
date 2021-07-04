@@ -7,8 +7,7 @@
 #error "base.h wasn't loaded correctly"
 #endif
 
-#include "random_adapter.h"
-#include "rand_replace.h"
+#include "thread_local_random.h"
 
 #include "inventory.h"
 #include "config.h"
@@ -278,7 +277,7 @@ int main(int argc, char **argv) {
 		}
 
 		// Seed each thread's PRNG for the select and randomise config options
-		srand(((int)time(NULL)) ^ rawID);
+		threadlocal_srand(((int)time(NULL)) ^ rawID);
 
 		while (max_outer_loops_fixed < 0 || cycle_count < max_outer_loops_fixed) {
 			if (askedToShutdown()) {

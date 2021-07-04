@@ -157,8 +157,9 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE inline void checkMallocFailed(const void* const p) 
 #else
 #define _PREFETCH_READ_NO_TEMPORAL_LOCALITY(addr) _REQUIRE_SEMICOLON
 #endif
-#endif
 
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+#endif /* CIPES_BASE_H */

@@ -1,3 +1,6 @@
 [submodule "Xoshiro-cpp"]
 	path = Xoshiro-cpp
 	url = https://github.com/Reputeless/Xoshiro-cpp
+[submodule "lemire-testingRNG"]
+	path = lemire-testingRNG
+	url = https://github.com/lemire/testingRNG/
